@@ -1,0 +1,26 @@
+name: Docs
+
+on:
+  push:
+    branches:
+      - main # Trigger the workflow when changes are pushed to the main branch
+
+jobs:
+  Docs:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get install doxygen graphviz
+
+      - name: Generate Doxygen Documentation
+        run: doxygen Doxyfile # Run Doxygen using your Doxyfile
+        working-directory: ./docs/doxygen/
+
+      - name: Upload docs to docs.icecube.aq
+        if: ${{ github.ref_name == 'main' && !github.event.act }}
+        working-directory: ./docs/doxygen/
+        run: |
+          tar -czvf golemfit_docs.tar.gz -Chtml .
+          curl -XPUT -i --data-binary @golemfit_docs.tar.gz https://docs.icecube.aq/api/upload?path=golemfit/${{ github.ref_name }} -u icecube:${{ secrets.ICECUBE_PASSWORD }}

@@ -1,0 +1,152 @@
+nohup: ignoring input
+reset_steering: 1
+reset_data: 1
+Loading DOM efficiency splines...
+Checking file from path ../../resources/Splines/DOMEffSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/domefficiency_spline_stacked_atmConv_track.fits
+Checking file from path ../../resources/Splines/DOMEffSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/domefficiency_spline_stacked_atmConv_shower.fits
+Checking file from path ../../resources/Splines/DOMEffSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/domefficiency_spline_stacked_atmPrompt_track.fits
+Checking file from path ../../resources/Splines/DOMEffSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/domefficiency_spline_stacked_atmPrompt_shower.fits
+Checking file from path ../../resources/Splines/DOMEffSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/domefficiency_spline_stacked_diffuseAstro_track.fits
+Checking file from path ../../resources/Splines/DOMEffSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/domefficiency_spline_stacked_diffuseAstro_shower.fits
+DOM efficiency splines validity range set to [1.220000, 1.360000].
+Loading Hole Ice splines...
+Checking file from path ../../resources/Splines/HoleIceSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/holeice_spline_stacked_atmConv_track.fits
+Checking file from path ../../resources/Splines/HoleIceSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/holeice_spline_stacked_atmConv_shower.fits
+Checking file from path ../../resources/Splines/HoleIceSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/holeice_spline_stacked_atmPrompt_track.fits
+Checking file from path ../../resources/Splines/HoleIceSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/holeice_spline_stacked_atmPrompt_shower.fits
+Checking file from path ../../resources/Splines/HoleIceSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/holeice_spline_stacked_diffuseAstro_track.fits
+Checking file from path ../../resources/Splines/HoleIceSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/holeice_spline_stacked_diffuseAstro_shower.fits
+Hole Ice splines forward parameter validity range set to [-6.250000, 2.750000].
+Loading attenuation splines...
+Checking file from path ../../resources/Splines/AttenuationSplines/new_ddmnodeis/attenuation_spline_atmConv_numu.fits
+Checking file from path ../../resources/Splines/AttenuationSplines/new_ddmnodeis/attenuation_spline_atmConv_numubar.fits
+Checking file from path ../../resources/Splines/AttenuationSplines/new_ddmnodeis/attenuation_spline_atmConv_nutau.fits
+Checking file from path ../../resources/Splines/AttenuationSplines/new_ddmnodeis/attenuation_spline_atmConv_nutaubar.fits
+Checking file from path ../../resources/Splines/AttenuationSplines/new_ddmnodeis/attenuation_spline_atmPrompt_numu.fits
+Checking file from path ../../resources/Splines/AttenuationSplines/new_ddmnodeis/attenuation_spline_atmPrompt_numubar.fits
+Checking file from path ../../resources/Splines/AttenuationSplines/new_ddmnodeis/attenuation_spline_atmPrompt_nutau.fits
+Checking file from path ../../resources/Splines/AttenuationSplines/new_ddmnodeis/attenuation_spline_atmPrompt_nutaubar.fits
+Checking file from path ../../resources/Splines/AttenuationSplines/new_ddmnodeis/attenuation_spline_diffuseAstro_numu.fits
+Checking file from path ../../resources/Splines/AttenuationSplines/new_ddmnodeis/attenuation_spline_diffuseAstro_numubar.fits
+Checking file from path ../../resources/Splines/AttenuationSplines/new_ddmnodeis/attenuation_spline_diffuseAstro_nutau.fits
+Checking file from path ../../resources/Splines/AttenuationSplines/new_ddmnodeis/attenuation_spline_diffuseAstro_nutaubar.fits
+Attenuation splines forward parameter validity range set to [0.791358, 1.208025].
+Loading Ice Gradients resources...
+Checking file from path ../../resources/Splines/IceGradientsSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/Amp_0_track.fits
+Checking file from path ../../resources/Splines/IceGradientsSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/Amp_0_shower.fits
+Checking file from path ../../resources/Splines/IceGradientsSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/Amp_1_track.fits
+Checking file from path ../../resources/Splines/IceGradientsSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/Amp_1_shower.fits
+Checking file from path ../../resources/Splines/IceGradientsSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/Amp_2_track.fits
+Checking file from path ../../resources/Splines/IceGradientsSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/Amp_2_shower.fits
+Checking file from path ../../resources/Splines/IceGradientsSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/Amp_3_track.fits
+Checking file from path ../../resources/Splines/IceGradientsSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/Amp_3_shower.fits
+Checking file from path ../../resources/Splines/IceGradientsSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/Amp_4_track.fits
+Checking file from path ../../resources/Splines/IceGradientsSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/Amp_4_shower.fits
+Checking file from path ../../resources/Splines/IceGradientsSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/Phs_1_track.fits
+Checking file from path ../../resources/Splines/IceGradientsSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/Phs_1_shower.fits
+Checking file from path ../../resources/Splines/IceGradientsSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/Phs_2_track.fits
+Checking file from path ../../resources/Splines/IceGradientsSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/Phs_2_shower.fits
+Checking file from path ../../resources/Splines/IceGradientsSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/Phs_3_track.fits
+Checking file from path ../../resources/Splines/IceGradientsSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/Phs_3_shower.fits
+Checking file from path ../../resources/Splines/IceGradientsSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/Phs_4_track.fits
+Checking file from path ../../resources/Splines/IceGradientsSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/Phs_4_shower.fits
+Loading Atmospheric Density Uncertainty resources...
+Checking file from path ../../resources/Splines/AtmosphericZenithVariationSplines/atm_density_1s.fits
+Loading Kaon Energy Losses Uncertainty resources...
+Checking file from path ../../resources/Splines/AtmosphericKaonLossesSplines/kaon_loses_1s.fits
+Loading Hadronic Uncertainty resources...
+Checking file from path ../fluxes/he_K+_.hdf5
+Checking file from path ../fluxes/he_K-_.hdf5
+Checking file from path ../fluxes/vhe1_pi+_.hdf5
+Checking file from path ../fluxes/vhe1_pi-_.hdf5
+Checking file from path ../fluxes/vhe3_K+_.hdf5
+Checking file from path ../fluxes/vhe3_K-_.hdf5
+Checking file from path ../fluxes/vhe3_pi+_.hdf5
+Checking file from path ../fluxes/vhe3_pi-_.hdf5
+Checking file from path ../fluxes/vhe3_p_.hdf5
+Checking file from path ../fluxes/vhe3_n_.hdf5
+Loading Cosmic Ray Uncertainty resources...
+Checking file from path ../fluxes/GSF_1_.hdf5
+Checking file from path ../fluxes/GSF_2_.hdf5
+Checking file from path ../fluxes/GSF_3_.hdf5
+Checking file from path ../fluxes/GSF_4_.hdf5
+Checking file from path ../fluxes/GSF_5_.hdf5
+Checking file from path ../fluxes/GSF_6_.hdf5
+Constructing DiffuseWeightMaker
+Loading Flux weighter
+Checking file from path ../fluxes/atmospheric.hdf5
+Checking file from path ../fluxes/prompt_atmospheric.hdf5
+Checking file from path ../fluxes/astro.hdf5
+Loading XS
+Checking file from path ../../resources/Splines/CrossSections/dsdxdy_nubar_CC_iso.fits
+Checking file from path ../../resources/Splines/CrossSections/dsdxdy_nu_NC_iso.fits
+Checking file from path ../../resources/Splines/CrossSections/dsdxdy_nubar_CC_iso.fits
+Checking file from path ../../resources/Splines/CrossSections/dsdxdy_nu_CC_iso.fits
+Loading MC weighter
+Loading Lepton weighter
+Loading data
+Checking file from path ../../data/IC86.h5
+Loaded 19727 experimental events
+Loading MC
+Begin Loading Sterile MC
+Number of MC sets and splits: 1 5
+Checking file from path ../../monte_carlo//STERILE/BDT_19738/BDT_19738_0.h5
+Checking file from path ../../monte_carlo//STERILE/BDT_19738/BDT_19738_1.h5
+Checking file from path ../../monte_carlo//STERILE/BDT_19738/BDT_19738_2.h5
+Checking file from path ../../monte_carlo//STERILE/BDT_19738/BDT_19738_3.h5
+Out of declared generation phase space. Impossible event. Encountered impossible to weight event. Removing it from deque. CAD.
+ energy: 1565.54
+ zenith: 1.84073
+ topology: 1
+ primaryType: 14
+ primaryZenith: 1.83962
+ primaryAzimuth: 6.28319
+ primaryEnergy: 2380.06
+ cachedWeight: 0
+ cachedConvWeight: 0
+ cachedPromptWeight: 0
+ cachedAstroWeight: 0
+ cachedDOMEffConv: 0
+ cachedDOMEffPrompt: 0
+ cachedDOMEffAstro: 0
+ cachedHoleIceConv: 0
+ cachedHoleIcePrompt: 0
+ cachedHoleIceAstro: 0
+ cachedHadronicHEkp: 0
+ cachedHadronicHEkm: 0
+ cachedHadronicVHE1pip: 0
+ cachedHadronicVHE1pim: 0
+ cachedHadronicVHE3kp: 0
+ cachedHadronicVHE3km: 0
+ cachedHadronicVHE3pip: 0
+ cachedHadronicVHE3pim: 0
+ cachedHadronicVHE3p: 0
+ cachedHadronicVHE3n: 0
+ cachedCosmicRay1: 0
+ cachedCosmicRay2: 0
+ cachedCosmicRay3: 0
+ cachedCosmicRay4: 0
+ cachedCosmicRay5: 0
+ cachedCosmicRay6: 0
+ cachedAtmDensity: 0
+ cachedKaonLosses: 0
+ cachedIceGrad0: 0
+ cachedIceGrad1: 0
+ cachedIceGrad2: 0
+ cachedIceGrad3: 0
+ cachedIceGrad4: 0
+ cachedIceGrad5: 0
+ cachedIceGrad6: 0
+ cachedIceGrad7: 0
+ cachedIceGrad8: 0
+
+Checking file from path ../../monte_carlo//STERILE/BDT_19738/BDT_19738_4.h5
+Loaded 13061947 events in main simulation set
+End Loading Sterile MC
+Making data hist
+Making sim hist
+Using metascaling 0.25. Note: large metascaling can produce inaccurate results.
+Went from this many MC events 13061947 to 814847
+/cvmfs/icecube.opensciencegrid.org/py3-v4.1.1/RHEL_8_x86_64/lib/python3.7/importlib/_bootstrap.py:219: RuntimeWarning: to-Python converter for nusquids::marray<double, 3u, std::allocator<double> > already registered; second conversion method ignored.
+  return f(*args, **kwds)
+Done generating FastMC.

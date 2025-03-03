@@ -1,0 +1,44 @@
+nohup: ignoring input
+reset_steering: 1
+reset_data: 1
+Loading DOM efficiency splines...
+Checking file from path ../../gollumfit-release/sources/GollumFit/resources/Splines/DOMEffSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/domefficiency_spline_stacked_atmConv_track.fits
+Checking file from path ../../gollumfit-release/sources/GollumFit/resources/Splines/DOMEffSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/domefficiency_spline_stacked_atmConv_shower.fits
+Checking file from path ../../gollumfit-release/sources/GollumFit/resources/Splines/DOMEffSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/domefficiency_spline_stacked_atmPrompt_track.fits
+Checking file from path ../../gollumfit-release/sources/GollumFit/resources/Splines/DOMEffSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/domefficiency_spline_stacked_atmPrompt_shower.fits
+Checking file from path ../../gollumfit-release/sources/GollumFit/resources/Splines/DOMEffSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/domefficiency_spline_stacked_diffuseAstro_track.fits
+Checking file from path ../../gollumfit-release/sources/GollumFit/resources/Splines/DOMEffSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/domefficiency_spline_stacked_diffuseAstro_shower.fits
+DOM efficiency splines validity range set to [1.220000, 1.360000].
+Loading Hole Ice splines...
+Checking file from path ../../gollumfit-release/sources/GollumFit/resources/Splines/HoleIceSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/holeice_spline_stacked_atmConv_track.fits
+Checking file from path ../../gollumfit-release/sources/GollumFit/resources/Splines/HoleIceSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/holeice_spline_stacked_atmConv_shower.fits
+Checking file from path ../../gollumfit-release/sources/GollumFit/resources/Splines/HoleIceSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/holeice_spline_stacked_atmPrompt_track.fits
+Checking file from path ../../gollumfit-release/sources/GollumFit/resources/Splines/HoleIceSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/holeice_spline_stacked_atmPrompt_shower.fits
+Checking file from path ../../gollumfit-release/sources/GollumFit/resources/Splines/HoleIceSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/holeice_spline_stacked_diffuseAstro_track.fits
+Checking file from path ../../gollumfit-release/sources/GollumFit/resources/Splines/HoleIceSplines/new_ddmnodeis/BDT/DnnEnergy_0.99/holeice_spline_stacked_diffuseAstro_shower.fits
+Hole Ice splines forward parameter validity range set to [-6.250000, 2.750000].
+Loading attenuation splines...
+Checking file from path ../../gollumfit-release/sources/GollumFit/resources/Splines/AttenuationSplines/new_ddmnodeis/attenuation_spline_atmConv_numu.fits
+Checking file from path ../../gollumfit-release/sources/GollumFit/resources/Splines/AttenuationSplines/new_ddmnodeis/attenuation_spline_atmConv_numubar.fits
+Checking file from path ../../gollumfit-release/sources/GollumFit/resources/Splines/AttenuationSplines/new_ddmnodeis/attenuation_spline_atmConv_nutau.fits
+Checking file from path ../../gollumfit-release/sources/GollumFit/resources/Splines/AttenuationSplines/new_ddmnodeis/attenuation_spline_atmConv_nutaubar.fits
+Checking file from path ../../gollumfit-release/sources/GollumFit/resources/Splines/AttenuationSplines/new_ddmnodeis/attenuation_spline_atmPrompt_numu.fits
+Checking file from path ../../gollumfit-release/sources/GollumFit/resources/Splines/AttenuationSplines/new_ddmnodeis/attenuation_spline_atmPrompt_numubar.fits
+Checking file from path ../../gollumfit-release/sources/GollumFit/resources/Splines/AttenuationSplines/new_ddmnodeis/attenuation_spline_atmPrompt_nutau.fits
+Checking file from path ../../gollumfit-release/sources/GollumFit/resources/Splines/AttenuationSplines/new_ddmnodeis/attenuation_spline_atmPrompt_nutaubar.fits
+Checking file from path ../../gollumfit-release/sources/GollumFit/resources/Splines/AttenuationSplines/new_ddmnodeis/attenuation_spline_diffuseAstro_numu.fits
+Checking file from path ../../gollumfit-release/sources/GollumFit/resources/Splines/AttenuationSplines/new_ddmnodeis/attenuation_spline_diffuseAstro_numubar.fits
+Checking file from path ../../gollumfit-release/sources/GollumFit/resources/Splines/AttenuationSplines/new_ddmnodeis/attenuation_spline_diffuseAstro_nutau.fits
+Checking file from path ../../gollumfit-release/sources/GollumFit/resources/Splines/AttenuationSplines/new_ddmnodeis/attenuation_spline_diffuseAstro_nutaubar.fits
+Attenuation splines forward parameter validity range set to [0.791358, 1.208025].
+Constructing DiffuseWeightMaker
+Loading compact data
+Checking file from path ../FastMC/STERILE.meows
+Making data hist
+Making sim hist
+/cvmfs/icecube.opensciencegrid.org/py3-v4.1.1/RHEL_8_x86_64/lib/python3.7/importlib/_bootstrap.py:219: RuntimeWarning: to-Python converter for nusquids::marray<double, 3u, std::allocator<double> > already registered; second conversion method ignored.
+  return f(*args, **kwds)
+saving to npz file.
+Done. Data saved to nullexpectation.npz
+3.68user 0.37system 0:06.69elapsed 60%CPU (0avgtext+0avgdata 528304maxresident)k
+694080inputs+50968outputs (8major+102136minor)pagefaults 0swaps

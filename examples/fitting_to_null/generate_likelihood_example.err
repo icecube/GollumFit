@@ -1,0 +1,4 @@
+/cvmfs/icecube.opensciencegrid.org/py3-v4.1.1/RHEL_8_x86_64/lib/python3.7/importlib/_bootstrap.py:219: RuntimeWarning: to-Python converter for nusquids::marray<double, 3u, std::allocator<double> > already registered; second conversion method ignored.
+  return f(*args, **kwds)
+10126.74user 83.24system 2:50:40elapsed 99%CPU (0avgtext+0avgdata 839396maxresident)k
+1445832inputs+8outputs (3010major+95758448minor)pagefaults 0swaps
