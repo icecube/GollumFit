@@ -1,12 +1,12 @@
-[submodule "sources/SQuIDS"]
-	path = sources/SQuIDS
+[submodule "vendor/SQuIDS"]
+	path = vendor/SQuIDS
 	url = https://github.com/jsalvado/SQuIDS.git
-[submodule "sources/nuSQuIDS"]
-	path = sources/nuSQuIDS
+[submodule "vendor/nuSQuIDS"]
+	path = vendor/nuSQuIDS
 	url = https://github.com/arguelles/nuSQuIDS.git
-[submodule "sources/PhysTools"]
-	path = sources/PhysTools
+[submodule "vendor/PhysTools"]
+	path = vendor/PhysTools
 	url = https://github.com/alexwenym/PhysTools.git
-[submodule "sources/LeptonWeighter"]
-	path = sources/LeptonWeighter
+[submodule "vendor/LeptonWeighter"]
+	path = vendor/LeptonWeighter
 	url = https://github.com/alexwenym/LeptonWeighter.git
