@@ -59,27 +59,27 @@ git submodule update --init --recursive
 Compile the required software, one-by-one: 
 ```
 # SQuIDS
-cd $GOLLUMSOURCEPATH/GollumFit/sources/SQuIDS
+cd $GOLLUMSOURCEPATH/GollumFit/vendor/SQuIDS
 ./configure --prefix=$PREFIX
 make
 make install
 
 # nuSQuIDS
-cd $GOLLUMSOURCEPATH/GollumFit/sources/nuSQuIDS
+cd $GOLLUMSOURCEPATH/GollumFit/vendor/nuSQuIDS
 ./configure --prefix=$PREFIX --with-squids=$PREFIX --with-python-bindings --with-boost=${SROOT}
 make
 make python
 make install
 
 # PhysTools
-cd $GOLLUMSOURCEPATH/GollumFit/sources/PhysTools
+cd $GOLLUMSOURCEPATH/GollumFit/vendor/PhysTools
 mkdir build build/lbfgsb
 ./configure --with-boost=${SROOT} --prefix=$PREFIX
 make
 make install
 
 # LeptonWeighter
-cd $GOLLUMSOURCEPATH/GollumFit/sources/LeptonWeighter
+cd $GOLLUMSOURCEPATH/GollumFit/vendor/LeptonWeighter
 ./configure --prefix=$PREFIX --with-boost=${SROOT}
 make
 make install
@@ -87,7 +87,7 @@ make install
 
 Now, compile GollumFit itself:
 ```
-cd $GOLLUMSOURCEPATH/GollumFit/Fit
+cd $GOLLUMSOURCEPATH/GollumFit
 make
 make install
 ```

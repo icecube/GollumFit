@@ -25,8 +25,8 @@ else:
                     COOLCVMFSROOT+'/include',
                     prefix+'/include',
                     np.get_include(),
-                    '../Fit/',
-                    '.']
+                    '../include/',
+                    '../src/']
 
     libraries = ['python3', 'boost_python{}{}'.format(sys.version_info[0], sys.version_info[1]),
                  'boost_filesystem','boost_iostreams','boost_system','boost_regex',
@@ -46,7 +46,8 @@ else:
                     f"/usr/lib/{architecture}-linux-gnu/hdf5/serial"]
 
 files = ['GollumFitPy.cpp']
-extra_objs = glob.glob('../Fit/*.o')
+gollum_space_path = os.environ['GOLLUMSPACE']
+extra_objs = glob.glob(gollum_space_path+'/lib/*.o')
 
 setup(name='GollumFitPy',
       ext_modules = [
