@@ -949,25 +949,25 @@ WARN_LOGFILE           =
 # spaces. See also FILE_PATTERNS and EXTENSION_MAPPING
 # Note: If this tag is empty the current directory is searched.
 
-INPUT                  = ../../Fit/analysisWeighting.h \
-                         ../../Fit/analysisWeighting.cpp \
-                         ../../Fit/compactIO.h \
-                         ../../Fit/compactIO.cpp \
-                         ../../Fit/Event.h \
-                         ../../Fit/Event.cpp \
-                         ../../Fit/FastMode.h \
-                         ../../Fit/GollumEnumDefinitions.h \
-                         ../../Fit/GollumEnumDefinitions.cpp \
-                         ../../Fit/GollumFit.h \
-                         ../../Fit/GollumFit.cpp \
-                         ../../Fit/GollumMCSet.h \
-                         ../../Fit/GollumMCSpecifications.h \
-                         ../../Fit/GollumParameters.h \
-                         ../../Fit/GollumParameters.cpp \
-                         ../../Fit/GollumTools.h \
-                         ../../Fit/GollumTools.cpp \
-                         ../../Fit/utils.h \
-                         ../../Fit/utils.cpp \ 
+INPUT                  = ../../include/analysisWeighting.h \
+                         ../../src/analysisWeighting.cpp \
+                         ../../include/compactIO.h \
+                         ../../src/compactIO.cpp \
+                         ../../include/Event.h \
+                         ../../src/Event.cpp \
+                         ../../include/FastMode.h \
+                         ../../include/GollumEnumDefinitions.h \
+                         ../../src/GollumEnumDefinitions.cpp \
+                         ../../include/GollumFit.h \
+                         ../../src/GollumFit.cpp \
+                         ../../include/GollumMCSet.h \
+                         ../../include/GollumMCSpecifications.h \
+                         ../../include/GollumParameters.h \
+                         ../../src/GollumParameters.cpp \
+                         ../../Fincludeit/GollumTools.h \
+                         ../../src/GollumTools.cpp \
+                         ../../include/utils.h \
+                         ../../src/utils.cpp \ 
                          ../manual/
 
 # This tag can be used to specify the character encoding of the source files
