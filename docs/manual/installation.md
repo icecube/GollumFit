@@ -7,7 +7,7 @@
 The following necessary prerequisites are included as subdirectories in GollumFit already:
 * SQuIDS (https://github.com/jsalvado/SQuIDS)
 * nuSQuIDS (https://github.com/arguelles/nuSQuIDS)
-* PhysTools (https://github.com/alexwenym/PhysTools.git)
+* PhysTools (https://github.com/icecube/PhysTools)
 * LeptonWeighter (https://github.com/alexwenym/LeptonWeighter.git)
 
 The following tools and libraries must be available on your system. Where relevant, the version that was most recently checked to work is indicated:
