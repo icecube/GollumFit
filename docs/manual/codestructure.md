@@ -15,7 +15,51 @@ that returns a weight for each event.
 
 By default, GollumFit includes handling of common nuisance parameters to all neutrino telescopes, as well as IceCube-specific neutrino telescopes. The following table lists the nuisance parameters that are included.
 
-| Parameter                                                                                         | `GollumFit` Variable        | Prior Value ± Width       | Weighting Method    |
+For more details, refer to the GollumFit publication.
+
+Common to all neutrino telescopes
+- `convNorm`
+- `zenithCorrection`
+- `kaonLosses`
+- `hadronicHEkp`
+- `hadronicHEkm`
+- `hadronicVHE1pip`
+- `hadronicVHE1pim`
+- `hadronicVHE3kp`
+- `hadronicVHE3km`
+- `hadronicVHE3pip`
+- `hadronicVHE3pim`
+- `hadronicVHE3p`
+- `hadronicVHE3n`
+- `cosmicRay1`
+- `cosmicRay2`
+- `cosmicRay3`
+- `cosmicRay4`
+- `cosmicRay5`
+- `cosmicRay6`
+- `astroNorm`
+- `astroDeltaGamma`
+- `astroDeltaGammaSec`
+- `astroPivot`
+- `promptNorm`
+- `NeutrinoAntineutrinoRatio`
+- `nuxs`
+- `nubarxs`
+
+IceCube-specific Monte Carlo parameters
+- `domEfficiency`
+- `holeiceForward`
+- `icegrad0`
+- `icegrad1`
+- `icegrad2`
+- `icegrad3`
+- `icegrad4`
+- `icegrad5`
+- `icegrad6`
+- `icegrad7`
+- `icegrad8`
+
+<!-- | Parameter                                                                                         | `GollumFit` Variable        | Prior Value ± Width       | Weighting Method    |
 |:--------------------------------------------------------------------------------------------------|:----------------------------|:--------------------------|:--------------------|
 | **Common to all neutrino telescopes**                                                             |                             |                           |                     |
 | \( \textrm{convNorm}  \)                                                                             | `convNorm`                  | \( 1.0 \pm 0.2 \)           | scale factor        |
@@ -56,7 +100,7 @@ By default, GollumFit includes handling of common nuisance parameters to all neu
 | \( \textrm{Ice Phs}_{1} \)                                                                           | `icegrad5`                  | \( 0.0 \pm 1.0 \)           | gradient            |
 | \( \textrm{Ice Phs}_{2} \)                                                                           | `icegrad6`                  | \( 0.0 \pm 1.0 \)           | gradient            |
 | \( \textrm{Ice Phs}_{3} \)                                                                           | `icegrad7`                  | \( 0.0 \pm 1.0 \)           | gradient            |
-| \( \textrm{Ice Phs}_{4} \)                                                                           | `icegrad8`                  | \( 0.0 \pm 1.0 \)           | gradient            |
+| \( \textrm{Ice Phs}_{4} \)                                                                           | `icegrad8`                  | \( 0.0 \pm 1.0 \)           | gradient            | -->
 
 
 <!-- <table border="1" cellspacing="0" cellpadding="4">
