@@ -15,48 +15,49 @@ that returns a weight for each event.
 
 By default, GollumFit includes handling of common nuisance parameters to all neutrino telescopes, as well as IceCube-specific neutrino telescopes. The following table lists the nuisance parameters that are included.
 
-| Parameter                                                                                         | `GollumFit` Variable       | Prior Value ± Width      | Weighting Method    |
-|:--------------------------------------------------------------------------------------------------|:---------------------------|:-------------------------|:--------------------|
-| **Common to all neutrino telescopes**                                                            |                              |                         |                      |
-| \f$\textrm{convNorm}\f$                                                                           | `convNorm`                 | \f$1.0 \pm 0.2\f$        | scale factor        |
-| \f$\rho_{\textrm{atm}}\f$                                                                         | `zenithCorrection`         | \f$0.0 \pm 1.0\f$        | gradient            |
-| \f$\sigma_{\textrm{K-Air}}\f$                                                                      | `kaonLosses`               | \f$0.0 \pm 1.0\f$        | gradient            |
-| \f$\textrm{K}_{158G}^{+}\f$                                                                        | `hadronicHEkp`             | \f$0.0 \pm 1.0\f$        | gradient            |
-| \f$\textrm{K}_{158G}^{-}\f$                                                                        | `hadronicHEkm`             | \f$0.0 \pm 1.0\f$        | gradient            |
-| \f$\pi_{20T}^{+}\f$                                                                                | `hadronicVHE1pip`          | \f$0.0 \pm 1.0\f$        | gradient            |
-| \f$\pi_{20T}^{-}\f$                                                                                | `hadronicVHE1pim`          | \f$0.0 \pm 1.0\f$        | gradient            |
-| \f$\textrm{K}_{2P}^{+}\f$                                                                          | `hadronicVHE3kp`           | \f$0.0 \pm 1.0\f$        | gradient            |
-| \f$\textrm{K}_{2P}^{-}\f$                                                                          | `hadronicVHE3km`           | \f$0.0 \pm 1.0\f$        | gradient            |
-| \f$\pi_{2P}^{+}\f$                                                                                 | `hadronicVHE3pip`          | \f$0.0 \pm 1.0\f$        | gradient            |
-| \f$\pi_{2P}^{-}\f$                                                                                 | `hadronicVHE3pim`          | \f$0.0 \pm 1.0\f$        | gradient            |
-| \f$\textrm{p}_{2P}\f$                                                                              | `hadronicVHE3p`            | \f$0.0 \pm 1.0\f$        | gradient            |
-| \f$\textrm{n}_{2P}\f$                                                                              | `hadronicVHE3n`            | \f$0.0 \pm 1.0\f$        | gradient            |
-| \f$\textrm{GSF}_1\f$                                                                               | `cosmicRay1`               | \f$0.0 \pm 1.0\f$        | gradient            |
-| \f$\textrm{GSF}_2\f$                                                                               | `cosmicRay2`               | \f$0.0 \pm 1.0\f$        | gradient            |
-| \f$\textrm{GSF}_3\f$                                                                               | `cosmicRay3`               | \f$0.0 \pm 1.0\f$        | gradient            |
-| \f$\textrm{GSF}_4\f$                                                                               | `cosmicRay4`               | \f$0.0 \pm 1.0\f$        | gradient            |
-| \f$\textrm{GSF}_5\f$                                                                               | `cosmicRay5`               | \f$0.0 \pm 1.0\f$        | gradient            |
-| \f$\textrm{GSF}_6\f$                                                                               | `cosmicRay6`               | \f$0.0 \pm 1.0\f$        | gradient            |
-| \f$\Phi^{\textrm{HE}}/10^{-18}\,\textrm{GeV}^{-1}\,\textrm{sr}^{-1}\,\textrm{s}^{-1}\,\textrm{cm}^{-2}\f$ | `astroNorm`                | \f$0.787 \pm 0.36\f$     | scale factor        |
-| \f$\Delta\gamma_{1}^{\textrm{HE}}\f$                                                               | `astroDeltaGamma`          | \f$0.0 \pm 0.36\f$       | power law formula   |
-| \f$\Delta\gamma_{2}^{\textrm{HE}}\f$                                                               | `astroDeltaGammaSec`       | \f$0.0 \pm 0.36\f$       | power law formula   |
-| \f$\log_{10}\left(\textrm{E}_{\textrm{break}}^{\textrm{HE}}/\textrm{GeV}\right)\f$               | `astroPivot`               | \f$5.0 \pm 1.0\f$        | power law formula   |
-| \f$\textrm{promptNorm}\f$                                                                          | `promptNorm`               | \f$1.0 \pm 1.0\f$        | scale factor        |
-| \f$\nu/ \bar{\nu}\f$                                                                              | `NeutrinoAntineutrinoRatio`| \f$1.0 \pm 1.0\f$        | scale factor        |
-| \f$\nu\textrm{ Att}\f$                                                                             | `nuxs`                     | \f$1.0 \pm 0.1\f$        | spline              |
-| \f$\bar{\nu}\textrm{ Att}\f$                                                                       | `nubarxs`                  | \f$1.0 \pm 0.1\f$        | spline              |
-| **IceCube-specific Monte Carlo parameters**                                                                                                                                   |
-| \f$\textrm{DOM}\:{\textrm{eff}}\f$                                                                 | `domEfficiency`            | \f$1.27 \pm 0.123\f$     | spline              |
-| \f$\textrm{Hole Ice}\f$                                                                            | `holeiceForward`           | \f$-1.0 \pm 10.0\f$      | spline              |
-| \f$\textrm{Ice A}_{0}\f$                                                                            | `icegrad0`                 | \f$0.0 \pm 1.0\f$        | gradient            |
-| \f$\textrm{Ice A}_{1}\f$                                                                            | `icegrad1`                 | \f$0.0 \pm 1.0\f$        | gradient            |
-| \f$\textrm{Ice A}_{2}\f$                                                                            | `icegrad2`                 | \f$0.0 \pm 1.0\f$        | gradient            |
-| \f$\textrm{Ice A}_{3}\f$                                                                            | `icegrad3`                 | \f$0.0 \pm 1.0\f$        | gradient            |
-| \f$\textrm{Ice A}_{4}\f$                                                                            | `icegrad4`                 | \f$0.0 \pm 1.0\f$        | gradient            |
-| \f$\textrm{Ice Phs}_{1}\f$                                                                          | `icegrad5`                 | \f$0.0 \pm 1.0\f$        | gradient            |
-| \f$\textrm{Ice Phs}_{2}\f$                                                                          | `icegrad6`                 | \f$0.0 \pm 1.0\f$        | gradient            |
-| \f$\textrm{Ice Phs}_{3}\f$                                                                          | `icegrad7`                 | \f$0.0 \pm 1.0\f$        | gradient            |
-| \f$\textrm{Ice Phs}_{4}\f$                                                                          | `icegrad8`                 | \f$0.0 \pm 1.0\f$        | gradient            |
+| Parameter                                                                                         | `GollumFit` Variable        | Prior Value ± Width       | Weighting Method    |
+|:--------------------------------------------------------------------------------------------------|:----------------------------|:--------------------------|:--------------------|
+| **Common to all neutrino telescopes**                                                             |                             |                           |                     |
+| \( \textrm{convNorm}  \)                                                                             | `convNorm`                  | \( 1.0 \pm 0.2 \)           | scale factor        |
+| \( \rho_{\textrm{atm}} \)                                                                           | `zenithCorrection`          | \( 0.0 \pm 1.0 \)           | gradient            |
+| \( \sigma_{\textrm{K-Air}} \)                                                                        | `kaonLosses`                | \( 0.0 \pm 1.0 \)           | gradient            |
+| \( \textrm{K}_{158G}^{+} \)                                                                          | `hadronicHEkp`              | \(  0.0 \pm 1.0 \)           | gradient            |
+| \( \textrm{K}_{158G}^{-} \)                                                                          | `hadronicHEkm`              | \( 0.0 \pm 1.0 \)           | gradient            |
+| \( \pi_{20T}^{+} \)                                                                                  | `hadronicVHE1pip`           | \( 0.0 \pm 1.0 \)           | gradient            |
+| \( \pi_{20T}^{-} \)                                                                                  | `hadronicVHE1pim`           | \( 0.0 \pm 1.0 \)           | gradient            |
+| \( \textrm{K}_{2P}^{+} \)                                                                            | `hadronicVHE3kp`            | \( 0.0 \pm 1.0 \)           | gradient            |
+| \( \textrm{K}_{2P}^{-} \)                                                                            | `hadronicVHE3km`            | \( 0.0 \pm 1.0 \)           | gradient            |
+| \( \pi_{2P}^{+} \)                                                                                   | `hadronicVHE3pip`           | \( 0.0 \pm 1.0 \)           | gradient            |
+| \( \pi_{2P}^{-} \)                                                                                   | `hadronicVHE3pim`           | \( 0.0 \pm 1.0 \)           | gradient            |
+| \( \textrm{p}_{2P} \)                                                                                | `hadronicVHE3p`             | \( 0.0 \pm 1.0 \)           | gradient            |
+| \( \textrm{n}_{2P} \)                                                                                | `hadronicVHE3n`             | \( 0.0 \pm 1.0 \)           | gradient            |
+| \( \textrm{GSF}_1 \)                                                                                 | `cosmicRay1`                | \( 0.0 \pm 1.0 \)           | gradient            |
+| \( \textrm{GSF}_2 \)                                                                                 | `cosmicRay2`                | \( 0.0 \pm 1.0 \)           | gradient            |
+| \( \textrm{GSF}_3 \)                                                                                 | `cosmicRay3`                | \( 0.0 \pm 1.0 \)           | gradient            |
+| \( \textrm{GSF}_4 \)                                                                                 | `cosmicRay4`                | \( 0.0 \pm 1.0 \)           | gradient            |
+| \( \textrm{GSF}_5 \)                                                                                 | `cosmicRay5`                | \( 0.0 \pm 1.0 \)           | gradient            |
+| \( \textrm{GSF}_6 \)                                                                                 | `cosmicRay6`                | \( 0.0 \pm 1.0 \)           | gradient            |
+| \( \Phi^{\textrm{HE}}/10^{-18}\,\textrm{GeV}^{-1}\,\textrm{sr}^{-1}\,\textrm{s}^{-1}\,\textrm{cm}^{-2} \) | `astroNorm`                 | \( 0.787 \pm 0.36 \)        | scale factor        |
+| \( \Delta\gamma_{1}^{\textrm{HE}} \)                                                                 | `astroDeltaGamma`           | \( 0.0 \pm 0.36 \)          | power law formula   |
+| \( \Delta\gamma_{2}^{\textrm{HE}} \)                                                                 | `astroDeltaGammaSec`        | \( 0.0 \pm 0.36 \)          | power law formula   |
+| \( \log_{10}\left(\textrm{E}_{\textrm{break}}^{\textrm{HE}}/\textrm{GeV}\right) \)                    | `astroPivot`                | \( 5.0 \pm 1.0 \)           | power law formula   |
+| \( \textrm{promptNorm} \)                                                                             | `promptNorm`                | \( 1.0 \pm 1.0 \)           | scale factor        |
+| \( \nu/\bar{\nu} \)                                                                                  | `NeutrinoAntineutrinoRatio` | \( 1.0 \pm 1.0 \)           | scale factor        |
+| \( \nu\textrm{ Att} \)                                                                               | `nuxs`                      | \( 1.0 \pm 0.1 \)           | spline              |
+| \( \bar{\nu}\textrm{ Att} \)                                                                         | `nubarxs`                   | \( 1.0 \pm 0.1 \)           | spline              |
+| **IceCube-specific Monte Carlo parameters**                                                        |                             |                           |                     |
+| \( \textrm{DOM} \: \textrm{eff} \)                                                                  | `domEfficiency`             | \( 1.27 \pm 0.123 \)        | spline              |
+| \( \textrm{Hole Ice} \)                                                                              | `holeiceForward`            | \( -1.0 \pm 10.0 \)         | spline              |
+| \( \textrm{Ice A}_{0} \)                                                                             | `icegrad0`                  | \( 0.0 \pm 1.0 \)           | gradient            |
+| \( \textrm{Ice A}_{1} \)                                                                             | `icegrad1`                  | \( 0.0 \pm 1.0 \)           | gradient            |
+| \( \textrm{Ice A}_{2} \)                                                                             | `icegrad2`                  | \( 0.0 \pm 1.0 \)           | gradient            |
+| \( \textrm{Ice A}_{3} \)                                                                             | `icegrad3`                  | \( 0.0 \pm 1.0 \)           | gradient            |
+| \( \textrm{Ice A}_{4} \)                                                                             | `icegrad4`                  | \( 0.0 \pm 1.0 \)           | gradient            |
+| \( \textrm{Ice Phs}_{1} \)                                                                           | `icegrad5`                  | \( 0.0 \pm 1.0 \)           | gradient            |
+| \( \textrm{Ice Phs}_{2} \)                                                                           | `icegrad6`                  | \( 0.0 \pm 1.0 \)           | gradient            |
+| \( \textrm{Ice Phs}_{3} \)                                                                           | `icegrad7`                  | \( 0.0 \pm 1.0 \)           | gradient            |
+| \( \textrm{Ice Phs}_{4} \)                                                                           | `icegrad8`                  | \( 0.0 \pm 1.0 \)           | gradient            |
+
 
 <!-- <table border="1" cellspacing="0" cellpadding="4">
   <tr>
