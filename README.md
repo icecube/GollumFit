@@ -59,13 +59,13 @@ Thank you for your interest in contributing to GollumFit! Please follow these st
 
 3. **Make Changes**
 
-4. **Commit & Push**
+4. **Commit & Push**  
     Push using `git push origin feature/your-feature-name`
 
-5. **Open a Pull Request**
+5. **Open a Pull Request**  
     Submit a pull request against the `main` branch and describe your changes.
 
-6. **Reporting Issues**
+6. **Reporting Issues**  
     Please open an issue if you find bugs or have feature requests.
 
 
