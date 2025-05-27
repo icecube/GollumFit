@@ -49,3 +49,5 @@ Full list of contributors: Spencer Axani, Gabriel Collin, Alejandro Diaz, Hrvoje
 Ben J. P. Jones and the UofTexas-Arlington group, Teppei Katori, Shivesh Mandalia, Marjon Moulai, 
 Jordi Salvado, Austin Schneider, Chris Weaver, 
 Tianlu Yuan, Carlos Argüelles-Delgado, Alfonso Garcia Soto, and Alex Wen.
+Special thanks to Lukas Hennig for handling containerization. 
+Special thanks to Lukas Henning, Archie Millsop, and Tanvi Krishnan for early testing of the public release.

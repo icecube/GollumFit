@@ -22,5 +22,5 @@ jobs:
         if: ${{ github.ref_name == 'main' && !github.event.act }}
         working-directory: ./docs/doxygen/
         run: |
-          tar -czvf golemfit_docs.tar.gz -Chtml .
-          curl -XPUT -i --data-binary @golemfit_docs.tar.gz https://docs.icecube.aq/api/upload?path=golemfit/${{ github.ref_name }} -u icecube:${{ secrets.ICECUBE_PASSWORD }}
+          tar -czvf gollumfit_docs.tar.gz -Chtml .
+          curl -XPUT -i --data-binary @gollumfit_docs.tar.gz https://docs.icecube.aq/api/upload?path=gollumfit/${{ github.ref_name }} -u icecube:${{ secrets.ICECUBE_PASSWORD }}
