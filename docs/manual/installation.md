@@ -14,7 +14,7 @@ The following tools and libraries must be available on your system. Where releva
 * `g++` (9.2.0)
 * `make` (4.2.1)
 * `GSL`
-* `boost` (1.7.1)
+* `boost` (1.71.0)
 * `hdf5` 
 * `pthread`
 * `photospline` (https://github.com/cnweaver/photospline)
