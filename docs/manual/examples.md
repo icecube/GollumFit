@@ -2,7 +2,9 @@
 
 To comprehensively demonstrate the capabilities of GollumFit, we provide a set of toy Monte Carlo, nuisance parameter splines & gradients, and a series of Python scripts to give a set of self-contained examples on the usage of `GollumFit`. In particular, we provide some examples on generating expectations, minimizing the LLH, and generating FastMC.
 
-The Monte Carlo is generated from some version of IceCube software and includes 5 files. This is stored in `GollumFit/monte_carlo`. The splines and gradients required for the minimization of the likelihood with respect to the nuisance parameters are stored in `GollumFit/resources`, which also include the scripts to generate some of them. Finally, the actual example scripts and their outputs are contained in `GollumFit/examples`.
+Example Monte Carlo is required to run these examples. It is generated from some version of IceCube software and includes 5 files. These must be downloaded from [https://doi.org/10.7910/DVN/5DSDTD](https://doi.org/10.7910/DVN/5DSDTD), and extracted to `GollumFit/monte_carlo/STERILE`. 
+
+The splines and gradients required for the minimization of the likelihood with respect to the nuisance parameters are stored in `GollumFit/resources`, which also include the scripts to generate some of them. Finally, the actual example scripts and their outputs are contained in `GollumFit/examples`.
 
 The examples featured here are split into code blocks with accompanying explanation. 
 The full example scripts are contained in the `examples` directory.
