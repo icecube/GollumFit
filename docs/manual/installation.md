@@ -123,7 +123,7 @@ The following section explains how to build a Docker image on your local machine
 ### Building the Docker container and uploading it to Docker Hub
 1. Install [Docker](https://docs.docker.com/engine/install/) (I also recommend the desktop app, but its not needed).
 2. Create a Docker Hub account [here](https://app.docker.com/signup) if you do not have one. You can use your Github or Google account. Make sure you have enough private repo slots available (the free plan offers only 1 private repo).
-3. Go to your [Docker Hub repositories](https://hub.docker.com/repositories/) and create a repo. We have to set it to private as long as GollumFit is not yet public.
+3. Go to your [Docker Hub repositories](https://hub.docker.com/repositories/) and create a repo.
 4. Clone the [GollumFit repo](https://github.com/icecube/GollumFit.git) to your local machine and `cd` into it.
 5. Create a builder with `docker buildx create --name gollumfit-builder --use`
 6. We want to build the container for `amd64` architectures (most clusters and non-Mac PCs) and push it to your Docker Hub. Optionally, as described further below, the container can additionally be built for `arm64` (most Mac PCs) architectures. The `amd64` build can be achieved with
