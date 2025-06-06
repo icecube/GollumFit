@@ -19,7 +19,6 @@ datapaths.diff_neutrino_cc_xs_spline_path        = "../../resources/Splines/Cros
 datapaths.diff_antineutrino_cc_xs_spline_path    = "../../resources/Splines/CrossSections/dsdxdy_nubar_CC_iso.fits"
 datapaths.diff_neutrino_nc_xs_spline_path        = "../../resources/Splines/CrossSections/dsdxdy_nu_NC_iso.fits"
 datapaths.diff_antineutrino_nc_xs_spline_path    = "../../resources/Splines/CrossSections/dsdxdy_nubar_CC_iso.fits"
-datapaths.data_path                              = "../../data/"
 datapaths.mc_path                                = "../../monte_carlo/"
 datapaths.domeff_spline_path                     = "../../resources/Splines/DOMEffSplines/new_ddmnodeis/BDT/DnnEnergy_0.99"
 datapaths.holeice_spline_path                    = "../../resources/Splines/HoleIceSplines/new_ddmnodeis/BDT/DnnEnergy_0.99"

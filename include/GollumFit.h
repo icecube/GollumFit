@@ -627,16 +627,16 @@ class GollumFit {
           ConstructMonteCarloGenerationWeighter();
           std::cout<<"Loading Lepton weighter" <<std::endl;
           ConstructLeptonWeighter();
-          std::cout<<"Loading data" <<std::endl;
-          assert(CheckDataPath(dataPaths_.data_path));
-          LoadData();
+          // std::cout<<"Loading data" <<std::endl;
+          // assert(CheckDataPath(dataPaths_.data_path));
+          // LoadData();
           std::cout<<"Loading MC" <<std::endl;
           assert(CheckDataPath(dataPaths_.mc_path));
           LoadMC();
         }
 
-        std::cout<<"Making data hist" <<std::endl;
-        ConstructDataHistogram();
+        // std::cout<<"Making data hist" <<std::endl;
+        // ConstructDataHistogram();
         std::cout<<"Making sim hist" <<std::endl;
         ConstructSimulationHistogram();
 

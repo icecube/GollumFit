@@ -72,7 +72,7 @@ void GollumFit::LoadData(){
 
 void GollumFit::LoadMC(){
 
-  std::cout << "Begin Loading Sterile MC" << std::endl;
+  std::cout << "Begin Loading MC" << std::endl;
 
   using namespace phys_tools::tableio;
 
@@ -237,7 +237,7 @@ void GollumFit::LoadMC(){
   std::cout << "Loaded " << mainSimulation_.size() << " events in main simulation set" << std::endl;
   assert(not mainSimulation_.empty());
 
-  std::cout << "End Loading Sterile MC" << std::endl;
+  std::cout << "End Loading MC" << std::endl;
 
   simulation_loaded_ = true;
   if(not simulation_loaded_)
@@ -536,10 +536,21 @@ void GollumFit::ConstructDataHistogram(){
 void GollumFit::ConstructSimulationHistogram(){
   if(not simulation_loaded_)
     throw std::runtime_error("No simulation has been loaded. Cannot construct simulation histogram.");
-  if(not data_histogram_constructed_)
-    throw std::runtime_error("Data histogram needs to be constructed before simulation histogram.");
 
-  simHist_ = std::make_tuple(makeEmptyHistogramCopy(std::get<0>(dataHist_)));
+  typedef std::remove_reference<decltype(std::get<0>(simHist_))>::type Hist0;
+
+  Hist0 h0(LogarithmicAxis(steeringParams_.logEbinEdge, steeringParams_.logEbinWidth), // energy dimension
+                       LinearAxis(steeringParams_.cosThbinEdge, steeringParams_.cosThbinWidth), // zenith dimension
+                       LinearAxis(0,1)); // topology dimension
+
+  simHist_ = std::make_tuple(h0);
+
+  auto& sim0 = std::get<0>(simHist_);
+  sim0.getAxis(0)->setLowerLimit(steeringParams_.minFitEnergy);
+  sim0.getAxis(0)->setUpperLimit(steeringParams_.maxFitEnergy);
+  sim0.getAxis(1)->setLowerLimit(steeringParams_.minCosth);
+  sim0.getAxis(1)->setUpperLimit(steeringParams_.maxCosth);
+
   bin(mainSimulation_, simHist_, binner);
 
   simulation_histogram_constructed_=true;
@@ -1014,9 +1025,7 @@ FitResult GollumFit::MinLLH() const {
 
 void GollumFit::ConstructFastMode(double meta_scaling) {
   if((not simulation_loaded_ ) or mainSimulation_.empty())
-    throw std::runtime_error("No simulation has been loaded. Cannot caress what does not exist.");
-  if(not data_loaded_)
-    throw std::runtime_error("No data has been loaded. Cannot construct data histogram.");
+    throw std::runtime_error("No simulation has been loaded.");
   // This piece of code is inspired in ideas implemented in LVTools by CA. A better implementation
   // was done, independently, by BJPJ on the Sterilizer.
 
@@ -1045,8 +1054,9 @@ void GollumFit::ConstructFastMode(double meta_scaling) {
   std::cout << "Went from this many MC events " << mainSimulation_.size() << " to " << metaEvents_.size() << std::endl;
   assert(!metaEvents_.empty());
 
-  simHist_ = std::make_tuple(makeEmptyHistogramCopy(std::get<0>(dataHist_)));
-  bin(metaEvents_, simHist_, binner);
+  auto newZeroHist = std::make_tuple(makeEmptyHistogramCopy(std::get<0>(simHist_)));
+  bin(metaEvents_, newZeroHist, binner);
+  simHist_ = std::move(newZeroHist);
 
   fastmode_constructed_ = true;
 }
