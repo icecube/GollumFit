@@ -1,0 +1,840 @@
+#!/bin/sh
+
+# GollumFit configure script
+
+###################################################################################################
+# helper functions
+###################################################################################################
+
+check_pkgconfig(){
+	if [ "$CHECKED_PKGCONFIG" ]; then return; fi
+	echo "Looking for pkg-config..."
+	which pkg-config 2>&1 > /dev/null
+	if [ "$?" -ne 0 ]; then
+		echo "Error: pkg-config not found; you will need to specify library locations manually" 1>&2
+		exit 1
+	fi
+	CHECKED_PKGCONFIG=1
+}
+
+find_package(){
+	PKG=$1
+	VAR_PREFIX=`echo $PKG | tr [:lower:] [:upper:]`
+	TMP_FOUND=`eval echo "$"${VAR_PREFIX}_FOUND`
+	if [ "$TMP_FOUND" ]; then return; fi
+	check_pkgconfig
+	echo "Looking for $PKG..."
+
+	pkg-config --exists $PKG
+	if [ "$?" -ne 0 ]; then
+		echo " $PKG not found with pkg-config"
+		return
+	fi
+	if [ $# -ge 2 ]; then
+		MIN_VERSION=$2
+		pkg-config --atleast-version $MIN_VERSION $PKG
+		if [ "$?" -ne 0 ]; then
+			echo "Error: installed $PKG version ("`pkg-config --modversion $PKG`") is too old; version >=$MIN_VERSION is required." 1>&2
+			exit 1
+		fi
+	fi
+	echo " Found $PKG version `pkg-config --modversion $PKG`"
+	eval ${VAR_PREFIX}_FOUND=1
+	eval ${VAR_PREFIX}_VERSION=\"`pkg-config --modversion $PKG`\"
+	eval ${VAR_PREFIX}_CFLAGS=\"`pkg-config --cflags $PKG`\"
+	eval ${VAR_PREFIX}_LDFLAGS=\"`pkg-config --libs $PKG`\"
+	eval ${VAR_PREFIX}_INCDIR=\"`pkg-config --variable=includedir $PKG`\"
+	eval ${VAR_PREFIX}_LIBDIR=\"`pkg-config --variable=libdir $PKG`\"
+}
+
+try_find_photospline(){
+	if [ ! "$PHOTOSPLINE_CONFIG" ]; then
+		PHOTOSPLINE_CONFIG="photospline-config"
+	fi
+
+	TMP_FOUND=`eval echo "$"PHOTOSPLINE_FOUND`
+	if [ "$TMP_FOUND" ]; then return; fi
+
+	which "$PHOTOSPLINE_CONFIG" 2>&1 > /dev/null
+	if [ "$?" -ne 0 ]; then return; fi
+
+	PHOTOSPLINE_VERSION=`$PHOTOSPLINE_CONFIG --version`
+	PHOTOSPLINE_CFLAGS=`$PHOTOSPLINE_CONFIG --cflags`
+	PHOTOSPLINE_LDFLAGS=`$PHOTOSPLINE_CONFIG --libs`
+
+	PHOTOSPLINE_FOUND=1
+}
+
+# less searching for python than verfying that the given executable works and extracting relevant paths
+try_find_python(){
+	echo "Looking for python"
+
+	if which ${PYTHON_EXE} > /dev/null 2>&1; then
+		PYTHON_EXE=$(which ${PYTHON_EXE} 2>/dev/null)
+		echo " Using python executable ${PYTHON_EXE}"
+	else
+		echo " ${PYTHON_EXE} is not a valid python executable"
+		return
+	fi
+
+	PYTHON_VERSION=`${PYTHON_EXE} -c 'import sys; print(str(sys.version_info.major)+"."+str(sys.version_info.minor))'`
+	if [ "$?" -ne 0 ]; then
+		echo "Unable to use python executable ${PYTHON_EXE} (version check failed)"
+		return
+	fi
+	PYTHONVERSIONSIMPLE=`${PYTHON_EXE} -c 'import sys; print(str(sys.version_info.major)+str(sys.version_info.minor))'`
+	
+	PYTHON_INCDIR=`${PYTHON_EXE} -c 'from distutils import sysconfig; print(sysconfig.get_python_inc())'`
+	if [ -d "$PYTHON_INCDIR" ]; then
+		echo " Found python include dir $PYTHON_INCDIR"
+	else
+		echo " Unable to locate the python include dir"
+		return
+	fi
+
+	# This is the directory to which libraries should be installed for python to find them
+	PYTHON_MODULEDIR=`${PYTHON_EXE} -c 'from distutils.sysconfig import get_python_lib; print(get_python_lib(plat_specific=True, standard_lib=False))'`
+	if [ "$PYTHON_MODULEDIR" ]; then
+		echo " Python module install dir is $PYTHON_MODULEDIR"
+	else
+		echo " Unable to locate the python module dir"
+		return
+	fi
+	
+	# This is the directory that python claims contains its standard library, 
+	# which may or may not include the actual libpython
+	PYTHON_STDLIBDIR=`${PYTHON_EXE} -c 'from distutils import sysconfig; print(sysconfig.get_python_lib(plat_specific=True,standard_lib=True))'`
+	# This may contain a suffix which appears after the version like in 'libpython3.6m'
+	# See https://www.python.org/dev/peps/pep-3149/#proposal
+	PYTHONLIBSUFFIX=`${PYTHON_EXE} -c 'from distutils import sysconfig; print(sysconfig.build_flags)' 2>/dev/null`
+
+	# Here we just try to guess every location anyone has ever seen a libpython in the wild
+	POSSIBLE_PYTHON_LIBDIRS="/lib /lib64 /usr/lib /usr/lib64 /usr/local/lib /usr/local/lib64 ${PYTHON_STDLIBDIR} ${PYTHON_STDLIBDIR}/lib"
+	# sometimes Apple puts a symlink in ${PYTHONSTDLIBDIR}/lib, sometimes it doesn't
+	TMP=`echo "$PYTHON_STDLIBDIR" | sed -n s'|\(.*/lib\)/python'"${PYTHON_VERSION}"'|\1|p'`
+	if [ "$TMP" ]; then POSSIBLE_PYTHON_LIBDIRS="${POSSIBLE_PYTHON_LIBDIRS} ${TMP}"; fi
+	# Ubuntu is special, of course
+	if uname -a | grep -i 'ubuntu' > /dev/null; then
+		POSSIBLE_PYTHON_LIBDIRS="${POSSIBLE_PYTHON_LIBDIRS} /usr/lib/$(uname -i)-linux-gnu"
+	fi
+
+	for PYTHON_LIBDIR in $POSSIBLE_PYTHON_LIBDIRS; do
+		for PV in $PYTHON_VERSION $PYTHONVERSIONSIMPLE; do
+			#echo "  Looking for ${PYTHON_LIBDIR}/libpython${PV}${PYTHONLIBSUFFIX}.(a|so|dylib)"
+			if [ -d $PYTHON_LIBDIR ]; then
+				if [ -e ${PYTHON_LIBDIR}/libpython${PV}${PYTHONLIBSUFFIX}.a ]; then
+					PYTHON_LIBRARY=${PYTHON_LIBDIR}/libpython${PV}${PYTHONLIBSUFFIX}.a
+					break
+				elif [ -e ${PYTHON_LIBDIR}/libpython${PV}${PYTHONLIBSUFFIX}.so ];then
+					PYTHON_LIBRARY=${PYTHON_LIBDIR}/libpython${PV}${PYTHONLIBSUFFIX}.so
+					break
+				elif [ -e ${PYTHON_LIBDIR}/libpython${PV}${PYTHONLIBSUFFIX}.dylib ]; then
+					PYTHON_LIBRARY=${PYTHON_LIBDIR}/libpython${PV}${PYTHONLIBSUFFIX}.dylib
+					break
+				fi
+			fi
+		done
+	done
+	if [ -e "$PYTHON_LIBRARY" ]; then
+		echo " Found python library $PYTHON_LIBRARY"
+	else
+		echo " Unable to locate the python library"
+		return
+	fi
+
+	PYTHON_CFLAGS="-I${PYTHON_INCDIR}"
+	PYTHON_LDFLAGS="-L${PYTHON_LIBDIR} -l$(echo "$PYTHON_LIBRARY" | sed 's|.*lib\(python.*\)\.[a-z]*|\1|')"
+	PYTHON_FOUND=1
+}
+
+try_find_boost(){
+	PKG=boost
+	VAR_PREFIX=`echo $PKG | tr [:lower:] [:upper:]`
+	TMP_FOUND=`eval echo "$"${VAR_PREFIX}_FOUND`
+	if [ "$TMP_FOUND" ]; then return; fi
+	if [ "$PYTHON_FOUND" ]; then
+		PYV=`${PYTHON_EXE} -c 'import sys; print(str(sys.version_info.major)+str(sys.version_info.minor))'`
+		PYVM=`${PYTHON_EXE} -c 'import sys; print(sys.version_info.major)'`
+		echo "Looking for $PKG built for python ${PYV} in $GUESS_DIR..."
+	else
+		echo "Looking for $PKG in $GUESS_DIR..."
+	fi
+	
+ 	if [ "$#" -eq 1 ]; then
+ 		GUESS_DIR=$1
+ 		POSSIBLE_BOOST_LIBDIRS="${GUESS_DIR}/lib ${GUESS_DIR}/lib64 ${GUESS_DIR}/lib/x86_64-linux-gnu"
+		POSSIBLE_BOOST_INCDIRS="${GUESS_DIR}/include"
+	elif [ "$#" -eq 2 ]; then
+		GUESS_DIR="$1 and $2"
+		POSSIBLE_BOOST_LIBDIRS="$2"
+		POSSIBLE_BOOST_INCDIRS="$1"
+	else
+		echo "Wrong number of arguments to try_find_boost"
+		return
+ 	fi
+	if [ "$PYTHON_FOUND" ]; then
+		for PYV_SUFFIX in $PYV $PYVM $PYV-mt $PYVM-mt ''; do
+			for BOOST_LIBDIR in $POSSIBLE_BOOST_LIBDIRS; do
+				if [ -d $BOOST_LIBDIR -a \( -e $BOOST_LIBDIR/libboost_python${PYV_SUFFIX}.a -o -e $BOOST_LIBDIR/libboost_python${PYV_SUFFIX}.so -o -e $BOOST_LIBDIR/libboost_python${PYV_SUFFIX}.dylib \) ]; then
+					if [ ! "$PYV_SUFFIX" ]; then
+						echo " Found boost_python with no python version tag; hoping it is compatible"
+					fi
+					BOOST_PYTHON_FOUND=1
+					BOOST_PYTHON_LDFLAGS="-lboost_python${PYV_SUFFIX}"
+					break
+				fi
+			done
+			if [ "$BOOST_PYTHON_FOUND" ]; then break; fi
+		done
+		if [ ! "$BOOST_PYTHON_FOUND" ]; then
+			echo " Unable to locate the boost_python library in $GUESS_DIR"
+		fi
+	fi
+	for BOOST_INCDIR in $POSSIBLE_BOOST_INCDIRS; do
+		if [ -d $BOOST_INCDIR -a -e $BOOST_INCDIR/boost/version.hpp ]; then
+			break
+		fi
+	done
+	if [ ! -d "$BOOST_INCDIR" -o ! -e "$BOOST_INCDIR/boost/version.hpp" ]; then
+		echo " Unable to locate boost/version.hpp in $GUESS_DIR"
+		return
+	fi
+	BOOST_CFLAGS="-I${BOOST_INCDIR}"
+	BOOST_LDFLAGS="-Wl,-rpath -Wl,${BOOST_LIBDIR} -L${BOOST_LIBDIR}"
+	BOOST_FOUND=1
+	echo " Found boost in $GUESS_DIR"
+	echo " Boost include directory is ${BOOST_INCDIR}"
+	if [ "$BOOST_LIBDIR" ]; then
+		echo " Boost library directory is ${BOOST_LIBDIR}"
+	fi
+}
+
+ensure_found(){
+	PKG=$1
+	VAR_PREFIX=`echo $PKG | tr [:lower:] [:upper:]`
+	TMP_FOUND=`eval echo "$"${VAR_PREFIX}_FOUND`
+	if [ "$TMP_FOUND" ]; then return; fi
+	#not found
+	echo "Error: $PKG not installed or not registered with pkg-config" 1>&2
+	lowername=`echo $PKG | tr [A-Z] [a-z]`
+	echo "Please specify location using the --with-"$lowername" flag" 1>&2
+	exit 1
+}
+
+###################################################################################################
+# prefixes
+###################################################################################################
+
+# Default installation prefixes
+prefix=/usr/local
+
+# Detect system characteristics
+dyn_arch=$(uname -m)
+OS_NAME=$(uname -s)
+
+GUESS_CC=gcc
+GUESS_CXX=g++
+GUESS_AR=ar
+GUESS_LD=ld
+if [ "$OS_NAME" = Linux ]; then
+	DYN_SUFFIX=.so
+	DYN_OPT='-shared -Wl,-soname,$(shell basename $(DYN_PRODUCT))'
+	DYN_OPT_PY='-shared -Wl,-soname,$(shell basename $(PYTHON_LIB))'
+fi
+if [ "$OS_NAME" = Darwin ]; then
+	GUESS_CC=clang
+	GUESS_CXX=clang++
+	GUESS_LD=clang++
+	DYN_SUFFIX=.dylib
+	DYN_OPT='-dynamiclib -compatibility_version $(VERSION) -current_version $(VERSION)'
+	DYN_OPT_PY='-dynamiclib -compatibility_version $(VERSION) -current_version $(VERSION)'
+fi
+CC=${CC-$GUESS_CC}
+CXX=${CXX-$GUESS_CXX}
+AR=${AR-$GUESS_AR}
+LD=${LD-$GUESS_LD}
+
+PYTHON_EXE="python"
+if which "$PYTHON_EXE" > /dev/null 2>&1; then
+	: # good, keep our initial guess
+elif which "python3" > /dev/null 2>&1; then
+	PYTHON_EXE="python3"
+fi
+
+###################################################################################################
+# help message
+###################################################################################################
+
+HELP="Usage: ./configure [OPTION]... 
+
+Installation directories:
+  --prefix=PREFIX         install files in PREFIX
+                          [$PREFIX]
+
+By default, \`make install' will install all the files in
+\`$PREFIX/bin', \`$PREFIX/lib' etc.  You can specify
+an installation prefix other than \`$PREFIX' using \`--prefix',
+for instance \`--prefix=\$HOME'.
+
+The following options can be used to maunally specify the 
+locations of dependencies:
+  --with-squids=DIR              	use the copy of SQuIDS in DIR
+                                 	assuming headers are in DIR/include
+                                 	and libraries in DIR/lib
+  --with-squids-incdir=DIR       	use the copy of SQuIDS in DIR
+  --with-squids-libdir=DIR       	use the copy of SQuIDS in DIR
+
+  --with-nusquids=DIR            	use the copy of nuSQuIDS in DIR
+                                 	assuming headers are in DIR/include
+                                 	and libraries in DIR/lib
+  --with-nusquids-incdir=DIR     	use the copy of nuSQuIDS in DIR
+  --with-nusquids-libdir=DIR     	use the copy of nuSQuIDS in DIR
+
+  --with-leptonweighter=DIR      	use the copy of LeptonWeighter in DIR
+                                 	assuming headers are in DIR/include
+                                 	and libraries in DIR/lib
+  --with-leptonweighter-incdir=DIR  use the copy of LeptonWeighter in DIR
+  --with-leptonweighter-libdir=DIR  use the copy of LeptonWeighter in DIR
+
+  --with-phystools=DIR			 	use the copy of PhysTools in DIR
+								 	assuming headers are in DIR/include
+								 	and libraries in DIR/lib
+  --with-phystools-incdir=DIR    	use the copy of PhysTools in DIR
+  --with-phystools-libdir=DIR    	use the copy of PhysTools in DIR					
+
+  --with-photospline-config=BIN  	Path to photospline-config executable
+
+  --with-hdf5-incdir=DIR         	use the copy of HDF5 in DIR
+  --with-hdf5-libdir=DIR         	use the copy of HDF5 in DIR
+  --with-hdf5=DIR                	use the copy of HDF5 in DIR
+                                 	assuming headers are in DIR/include
+                                 	and libraries in DIR/lib
+
+  --with-boost-incdir=DIR        	use the copy of Boost in DIR
+  --with-boost-libdir=DIR        	use the copy of Boost in DIR
+  --with-boost=DIR               	use the copy of Boost in DIR
+                                 	assuming headers are in DIR/include
+                                 	and libraries in DIR/lib
+
+  --with-photospline-config=BIN  	Path to photospline-config executable
+
+  --python-bin=PYTHON_EXECUTABLE  	use this python executable
+                                 	(default is $PYTHON_EXE)
+  --python-module-dir=DIR        	install python module to this directory, rather
+                                 	than the default system location. The special 
+                                 	value site.USER_SITE will be automatically
+                                 	expanded using the python interpreter
+
+Some influential environment variables:
+CC          C compiler command
+CXX         C++ compiler command
+AR          Static linker command
+LD          Dynamic linker command
+" #`
+
+###################################################################################################
+# command line arguments
+###################################################################################################
+
+for var in "$@"
+do
+	if [ "$var" = "--help" -o "$var" = "-h" ]; then
+		echo "$HELP"
+		exit 0
+	fi
+
+  # PREFIX #
+	TMP=`echo "$var" | sed -n 's/^--prefix=\(.*\)$/\1/p'`
+	if [ "$TMP" ]; then PREFIX="$TMP"; continue; fi
+
+  # SQUIDS #
+	TMP=`echo "$var" | sed -n 's/^--with-squids=\(.*\)$/\1/p'`
+	if [ "$TMP" ]; then
+		SQUIDS_INCDIR="${TMP}/include";
+		SQUIDS_LIBDIR="${TMP}/lib";
+	continue; fi
+
+	TMP=`echo "$var" | sed -n 's/^--with-squids-incdir=\(.*\)$/\1/p'`
+	if [ "$TMP" ]; then SQUIDS_INCDIR="$TMP"; continue; fi
+
+	TMP=`echo "$var" | sed -n 's/^--with-squids-libdir=\(.*\)$/\1/p'`
+	if [ "$TMP" ]; then SQUIDS_LIBDIR="$TMP"; continue; fi
+
+  # NUSQUIDS #
+	TMP=`echo "$var" | sed -n 's/^--with-nusquids=\(.*\)$/\1/p'`
+	if [ "$TMP" ]; then
+		NUSQUIDS_INCDIR="${TMP}/include";
+		NUSQUIDS_LIBDIR="${TMP}/lib";
+	continue; fi
+
+	TMP=`echo "$var" | sed -n 's/^--with-nusquids-incdir=\(.*\)$/\1/p'`
+	if [ "$TMP" ]; then NUSQUIDS_INCDIR="$TMP"; continue; fi
+
+	TMP=`echo "$var" | sed -n 's/^--with-nusquids-libdir=\(.*\)$/\1/p'`
+	if [ "$TMP" ]; then NUSQUIDS_LIBDIR="$TMP"; continue; fi
+
+  # LEPTONWEIGHTER #
+	TMP=`echo "$var" | sed -n 's/^--with-leptonweighter=\(.*\)$/\1/p'`
+	if [ "$TMP" ]; then
+		LEPTONWEIGHTER_INCDIR="${TMP}/include";
+		LEPTONWEIGHTER_LIBDIR="${TMP}/lib";
+	continue; fi
+
+	TMP=`echo "$var" | sed -n 's/^--with-leptonweighter-incdir=\(.*\)$/\1/p'`
+	if [ "$TMP" ]; then LEPTONWEIGHTER_INCDIR="$TMP"; continue; fi
+
+	TMP=`echo "$var" | sed -n 's/^--with-leptonweighter-libdir=\(.*\)$/\1/p'`
+	if [ "$TMP" ]; then LEPTONWEIGHTER_LIBDIR="$TMP"; continue; fi
+
+  # PHYSTOOLS #
+	TMP=`echo "$var" | sed -n 's/^--with-phystools=\(.*\)$/\1/p'`
+	if [ "$TMP" ]; then
+		PHYSTOOLS_INCDIR="${TMP}/include";
+		PHYSTOOLS_LIBDIR="${TMP}/lib";
+	continue; fi
+
+	TMP=`echo "$var" | sed -n 's/^--with-phystools-incdir=\(.*\)$/\1/p'`
+	if [ "$TMP" ]; then PHYSTOOLS_INCDIR="$TMP"; continue; fi
+
+	TMP=`echo "$var" | sed -n 's/^--with-phystools-libdir=\(.*\)$/\1/p'`
+	if [ "$TMP" ]; then PHYSTOOLS_LIBDIR="$TMP"; continue; fi
+
+  # PHOTOSPLINE #
+	TMP=`echo "$var" | sed -n 's/^--with-photospline-config=\(.*\)$/\1/p'`
+	if [ "$TMP" ]; then
+		PHOTOSPLINE_CONFIG="${TMP}";
+	continue; fi
+
+  # HDF5 #
+	TMP=`echo "$var" | sed -n 's/^--with-hdf5=\(.*\)$/\1/p'`
+	if [ "$TMP" ]; then
+		HDF5_INCDIR="${TMP}/include";
+		HDF5_LIBDIR="${TMP}/lib";
+	continue; fi
+
+	TMP=`echo "$var" | sed -n 's/^--with-hdf5-libdir=\(.*\)$/\1/p'`
+	if [ "$TMP" ]; then HDF5_LIBDIR="$TMP"; continue; fi
+	TMP=`echo "$var" | sed -n 's/^--with-hdf5-incdir=\(.*\)$/\1/p'`
+	if [ "$TMP" ]; then HDF5_INCDIR="$TMP"; continue; fi
+
+  # BOOST #
+	TMP=`echo "$var" | sed -n 's/^--with-boost=\(.*\)$/\1/p'`
+	if [ "$TMP" ]; then
+		BOOST_INCDIR="${TMP}/include";
+		BOOST_LIBDIR="${TMP}/lib";
+	continue; fi
+
+	TMP=`echo "$var" | sed -n 's/^--with-boost-libdir=\(.*\)$/\1/p'`
+	if [ "$TMP" ]; then BOOST_LIBDIR="$TMP"; continue; fi
+	TMP=`echo "$var" | sed -n 's/^--with-boost-incdir=\(.*\)$/\1/p'`
+	if [ "$TMP" ]; then BOOST_INCDIR="$TMP"; continue; fi
+
+  # PYTHON #
+	TMP=`echo "$var" | sed -n 's/^--python-bin=\(.*\)$/\1/p'`
+	if [ "$TMP" ]; then PYTHON_EXE="${TMP}"; continue; fi
+	TMP=`echo "$var" | sed -n 's/^--python-module-dir=\(.*\)$/\1/p'`
+	if [ "$TMP" ]; then USER_PYTHON_MODULE_DIR="${TMP}"; continue; fi
+
+  # KILL #
+	echo "config.sh: Unknown or malformed option '$var'" 1>&2
+	exit 1
+done
+
+###################################################################################################
+# find packages
+###################################################################################################
+
+export PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH
+
+if [ "$SQUIDS_INCDIR" -a "$SQUIDS_LIBDIR" ]; then
+	echo "Checking manually specified SQUIDS..."
+	if [ -d "$SQUIDS_INCDIR" \
+         -a -d "$SQUIDS_LIBDIR" \
+         -a -e "$SQUIDS_LIBDIR/libSQuIDS.a" ]; then
+		SQUIDS_FOUND=1
+		SQUIDS_CFLAGS="-I$SQUIDS_INCDIR"
+		SQUIDS_LDFLAGS="-L$SQUIDS_LIBDIR -lSQuIDS"
+		if $CXX --version | grep -q "Free Software Foundation"; then
+			SQUIDS_CFLAGS="$SQUIDS_CFLAGS -Wno-abi"
+		fi
+	else
+		echo "Warning: manually specifed SQUIDS not found; will attempt auto detection"
+	fi
+fi
+
+find_package squids 1.2
+
+
+if [ "$NUSQUIDS_INCDIR" -a "$NUSQUIDS_LIBDIR" ]; then
+	echo "Checking manually specified nuSQuIDS..."
+	if [ -d "$NUSQUIDS_INCDIR" \
+         -a -d "$NUSQUIDS_LIBDIR" \
+         -a -e "$NUSQUIDS_LIBDIR/libnuSQuIDS.a" ]; then
+		NUSQUIDS_FOUND=1
+		NUSQUIDS_CFLAGS="-I$NUSQUIDS_INCDIR"
+		NUSQUIDS_LDFLAGS="-L$NUSQUIDS_LIBDIR -lnuSQuIDS"
+		if $CXX --version | grep -q "Free Software Foundation"; then
+			SQUIDS_CFLAGS="$NUSQUIDS_CFLAGS -Wno-abi"
+		fi
+	else
+		echo "Warning: manually specifed nuSQuIDS not found; will attempt auto detection"
+	fi
+fi
+
+find_package nusquids 1.0
+
+if [ "$LEPTONWEIGHTER_INCDIR" -a "$LEPTONWEIGHTER_LIBDIR" ]; then
+	echo "Checking manually specified LeptonWeighter..."
+	if [ -d "$LEPTONWEIGHTER_INCDIR" \
+         -a -d "$LEPTONWEIGHTER_LIBDIR" \
+         -a -e "$LEPTONWEIGHTER_LIBDIR/libLeptonWeighter.a" ]; then
+		LEPTONWEIGHTER_FOUND=1
+		LEPTONWEIGHTER_CFLAGS="-I$LEPTONWEIGHTER_INCDIR"
+		LEPTONWEIGHTER_LDFLAGS="-L$LEPTONWEIGHTER_LIBDIR -lLeptonWeighter"
+	else
+		echo "Warning: manually specifed LeptonWeighter not found; will attempt auto detection"
+	fi
+fi
+
+find_package leptonweighter 1.0
+
+if [ "$PHYSTOOLS_INCDIR" -a "$PHYSTOOLS_LIBDIR" ]; then
+	echo "Checking manually specified PhysTools..."
+	if [ -d "$PHYSTOOLS_INCDIR" \
+         -a -d "$PHYSTOOLS_LIBDIR" \
+         -a -e "$PHYSTOOLS_LIBDIR/libPhysTools.a" ]; then
+		PHYSTOOLS_FOUND=1
+		PHYSTOOLS_CFLAGS="-I$PHYSTOOLS_INCDIR"
+		PHYSTOOLS_LDFLAGS="-L$PHYSTOOLS_LIBDIR -lPhysTools"
+	else
+		echo "Warning: manually specifed PhysTools not found; exiting."
+		exit 1
+	fi
+fi
+
+
+if [ "$HDF5_INCDIR" -a "$HDF5_LIBDIR" ]; then
+	echo "Checking manually specified hdf5..."
+	if [ -d "$HDF5_INCDIR" \
+         -a -d "$HDF5_LIBDIR" \
+         -a -e "$HDF5_LIBDIR/libhdf5.a" \
+         -a -e "$HDF5_LIBDIR/libhdf5_cpp.a" ]; then
+		HDF5_FOUND=1
+		HDF5_CFLAGS="-I$HDF5_INCDIR"
+		HDF5_LDFLAGS="-L$HDF5_LIBDIR -lhdf5 -lhdf5_hl"
+	else
+        echo "Warning: manually specifed HDF5 not found; will attempt auto detection"
+	fi
+fi
+
+find_package hdf5
+
+if [ "$PHOTOSPLINE_CONFIG" ]; then
+	echo "Checking manually specified photospline-config..."
+	if [ ! "$PHOTOSPLINE_CONFIG" ]; then
+    PHOTOSPLINE_CONFIG="photospline-config"
+		echo "Warning: manually specifed photospline-config not found; will attempt auto detection"
+	fi
+fi
+
+try_find_photospline
+
+find_package cfitsio
+
+try_find_python
+
+if [ "$PYTHON_FOUND" != 1 ]; then
+	echo "*** Failed to find Python; Python bindings will not be built! ***"
+else
+	if [ "$USER_PYTHON_MODULE_DIR" ]; then
+		if [ "$USER_PYTHON_MODULE_DIR" == "site.USER_SITE" ]; then
+			PYTHON_MODULEDIR=`${PYTHON_EXE} -c 'import site; print(site.USER_SITE)'`
+		else
+			PYTHON_MODULEDIR="$USER_PYTHON_MODULE_DIR"
+		fi
+	fi
+fi
+
+if [ "$BOOST_INCDIR" -a "$BOOST_LIBDIR" ]; then
+	echo "Checking manually specified boost..."
+	try_find_boost "$BOOST_INCDIR" "$BOOST_LIBDIR"
+	if [ ! "$BOOST_FOUND" ]; then
+		echo "Warning: manually specifed boost not found; will attempt auto detection"
+	fi
+fi
+
+try_find_boost /usr
+try_find_boost /usr/local
+
+if [ -z "$BOOST_LIBDIR" -a  -z "$BOOST_INCDIR" ]; then
+  echo "Error: Specify BOOST library path using --with-boost-libdir and BOOST include path using --with-boost-incdir."
+  exit 1
+fi
+
+if [ -z $BOOST_INCDIR ]; then
+  echo "Error: Specify BOOST include path using  --with-boost-incdir."
+  exit 1
+fi
+
+if [ "$BOOST_PYTHON_FOUND" != 1 ]; then
+	echo "*** Failed to find Boost Python; Python bindings will not be built ***"
+fi
+
+ensure_found squids
+ensure_found nusquids
+ensure_found leptonweighter
+ensure_found photospline
+ensure_found boost
+
+###################################################################################################
+# make required directories
+###################################################################################################
+
+if [ ! -d ./build/ ]; then
+    mkdir build;
+fi
+if [ ! -d ./lib/ ]; then
+    mkdir lib;
+fi
+
+# Resolve PREFIX absolutely
+OLDPWD=`pwd`
+cd "$PREFIX"
+PREFIX=`pwd`
+cd "$OLDPWD"
+
+###################################################################################################
+# generate pkg-config file
+###################################################################################################
+
+echo "Generating pkg-config file..."
+echo "prefix=$PREFIX" > lib/gollumfit.pc
+
+PKGCONF_REQUIREMENTS=""
+if [ "$NUSQUIDS_FOUND" ]; then
+	PKGCONF_REQUIREMENTS="$PKGCONF_REQUIREMENTS nusquids >= 1.0.0"
+fi
+if [ "$LEPTONWEIGHTER_FOUND" ]; then
+	PKGCONF_REQUIREMENTS="$PKGCONF_REQUIREMENTS leptonweighter >= 0.0.1"
+fi
+if [ "$PHYSTOOLS_FOUND" ]; then
+	PKGCONF_REQUIREMENTS="$PKGCONF_REQUIREMENTS PhysTools >= 0.0.1"
+fi
+
+echo '
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: GollumFit
+Description: Diffuse fitter.
+URL: https://github.com/icecube/GollumFit
+Version: 1.0.0
+Requires: gsl >= 1.15 hdf5 >= 1.8 squids >= 1.2.0 nusquids >= 1.10.1 phystools >= 0.0.1 leptonweighter >= 0.0.1 photospline >= 0.0.1 cfitsio >= 3.47 boost >= 1.65
+Libs: -L${libdir}/lib -lGollumFit
+Cflags: -I${includedir}/GollumFit
+' >> lib/gollumfit.pc
+
+###################################################################################################
+# start generating Makefile
+###################################################################################################
+
+echo "Generating makefile..."
+echo "# Compiler
+CC=$CC
+CXX=$CXX
+AR=$AR
+LD=$LD
+
+DYN_SUFFIX=$DYN_SUFFIX
+DYN_OPT=$DYN_OPT
+DYN_OPT_PY=$DYN_OPT_PY
+
+VERSION=$VERSION
+PREFIX=$PREFIX
+" > ./Makefile
+
+echo '
+PATH_GF=$(shell pwd)
+
+SOURCES = $(PATH_GF)/src/analysisWeighting.cpp \
+          $(PATH_GF)/src/GollumParameters.cpp \
+          $(PATH_GF)/src/compactIO.cpp \
+          $(PATH_GF)/src/Event.cpp \
+          $(PATH_GF)/src/GollumTools.cpp \
+          $(PATH_GF)/src/GollumEnumDefinitions.cpp \
+		  $(PATH_GF)/src/utils.cpp \
+		  $(PATH_GF)/src/GollumFit.cpp
+
+HEADERS = $(PATH_GF)/include/analysisWeighting.h \
+          $(PATH_GF)/include/GollumParameters.h \
+          $(PATH_GF)/include/compactIO.h \
+          $(PATH_GF)/include/Event.h \
+          $(PATH_GF)/include/FastMode.h \
+          $(PATH_GF)/include/GollumEnumDefinitions.h \
+          $(PATH_GF)/include/GollumFit.h \
+          $(PATH_GF)/include/GollumMCSet.h \
+          $(PATH_GF)/include/GollumMCSpecifications.h \
+		  $(PATH_GF)/include/GollumTools.h \
+		  $(PATH_GF)/include/json.hpp \
+		  $(PATH_GF)/include/utils.h
+
+' >> ./Makefile
+
+echo '
+
+CFLAGS=-O0 -fPIC
+
+CXXFLAGS +=-std=c++17 -O3
+
+# Directories
+'  >> ./Makefile
+
+echo "SQUIDS_CFLAGS=$SQUIDS_CFLAGS" >> ./Makefile
+echo "SQUIDS_LDFLAGS=$SQUIDS_LDFLAGS" >> ./Makefile
+
+echo "NUSQUIDS_CFLAGS=$NUSQUIDS_CFLAGS" >> ./Makefile
+echo "NUSQUIDS_LDFLAGS=$NUSQUIDS_LDFLAGS" >> ./Makefile
+
+echo "LEPTONWEIGHTER_CFLAGS=$LEPTONWEIGHTER_CFLAGS" >> ./Makefile
+echo "LEPTONWEIGHTER_LDFLAGS=$LEPTONWEIGHTER_LDFLAGS" >> ./Makefile
+
+echo "PHYSTOOLS_CFLAGS=$PHYSTOOLS_CFLAGS" >> ./Makefile
+echo "PHYSTOOLS_LDFLAGS=$PHYSTOOLS_LDFLAGS" >> ./Makefile
+
+echo "BOOST_CFLAGS=$BOOST_CFLAGS" >> ./Makefile
+echo "BOOST_LDFLAGS=$BOOST_LDFLAGS" >> ./Makefile
+
+echo "PHOTOSPLINE_CFLAGS=$PHOTOSPLINE_CFLAGS" >> ./Makefile
+echo "PHOTOSPLINE_LDFLAGS=$PHOTOSPLINE_LDFLAGS" >> ./Makefile
+
+echo "CFITSIO_CFLAGS=$CFITSIO_CFLAGS" >> ./Makefile
+echo "CFITSIO_LDFLAGS=$CFITSIO_LDFLAGS" >> ./Makefile
+
+echo "HDF5_CFLAGS=$HDF5_CFLAGS" >> ./Makefile
+echo "HDF5_LDFLAGS=$HDF5_LDFLAGS" >> ./Makefile
+
+if [ "$BOOST_PYTHON_FOUND" ]; then
+	echo "PYTHON_CFLAGS=$PYTHON_CFLAGS" >> ./Makefile
+	echo "PYTHON_LDFLAGS=$PYTHON_LDFLAGS" >> ./Makefile
+	echo "BOOST_PYTHON_LDFLAGS=$BOOST_PYTHON_LDFLAGS" >> ./Makefile
+	echo "PYTHON_MODULEDIR=$PYTHON_MODULEDIR" >> ./Makefile
+fi
+
+echo '
+
+INC_GF=$(PATH_GF)/include
+SRC_GF=$(PATH_GF)/src
+LIB_GF=$(PATH_GF)/lib
+
+# FLAGS
+CXXFLAGS+= -fPIC -I$(INC_GF) $(SQUIDS_CFLAGS) $(NUSQUIDS_CFLAGS) $(LEPTONWEIGHTER_CFLAGS) $(PHYSTOOLS_CFLAGS) $(PHOTOSPLINE_CFLAGS) $(CFITSIO_CFLAGS) $(BOOST_CFLAGS) $(HDF5_CFLAGS)
+
+LDFLAGS= -Wl,-rpath -Wl,$(LIB_GF) -L$(LIB_GF)
+LDFLAGS+= $(NUSQUIDS_LDFLAGS) $(SQUIDS_LDFLAGS) $(LEPTONWEIGHTER_LDFLAGS) $(PHYSTOOLS_LDFLAGS) $(PHOTOSPLINE_LDFLAGS) $(CFITSIO_LDFLAGS) $(BOOST_LDFLAGS) $(HDF5_LDFLAGS)
+
+CXXFLAGS+=-I/usr/local/include/
+CXXFLAGS+=-I${PREFIX}/include/
+
+LDFLAGS+=-L/usr/local/lib/
+LDFLAGS+=-L${PREFIX}/lib/
+LDFLAGS+=-L/usr/local/lib64/
+LDFLAGS+=-L${PREFIX}/lib64/
+ARCH := $(shell uname -m)
+LDFLAGS+=-L/usr/lib/${ARCH}-linux-gnu/hdf5/serial/
+
+LDFLAGS+=-lgsl -lgslcblas -lm
+LDFLAGS+=-lboost_system -lboost_iostreams -lboost_filesystem -lboost_regex
+LDFLAGS+=-lhdf5 -lhdf5_hl -pthread
+LDFLAGS+=-lphotospline -lcfitsio
+
+LDFLAGS+=-lPhysTools
+LDFLAGS+=-lSQuIDS -lnuSQuIDS
+LDFLAGS+=-lLeptonWeighter
+
+GOLLUM_HELPER_OBJECTS = Event.o analysisWeighting.o utils.o compactIO.o GollumFit.o GollumParameters.o GollumTools.o GollumEnumDefinitions.o
+
+OS_NAME=$(shell uname -s)
+
+ifeq (${OS_NAME},Linux)
+DYN_SUFFIX=.so
+DYN_OPT=-shared -Wl,-soname,$(shell basename $(DYN_PRODUCT))
+endif
+
+ifeq (${OS_NAME},Darwin)
+DYN_SUFFIX=.dylib
+DYN_OPT=-dynamiclib -compatibility_version $(VERSION) -current_version $(VERSION)
+endif
+
+# Project files
+NAME=GollumFit
+VERSION=1.0.0
+STAT_PRODUCT:=$(LIB_GF)/lib/lib$(NAME).a
+DYN_PRODUCT:=$(LIB_GF)/lib/lib$(NAME)$(DYN_SUFFIX)
+OBJECTS = $(addprefix $(LIB_GF)/, $(GOLLUM_HELPER_OBJECTS))
+
+# Compilation rules
+all: $(STAT_PRODUCT) $(DYN_PRODUCT)
+
+.PHONY: all clean
+
+clean:
+	rm -rf $(OBJECTS) $(DYN_PRODUCT) $(STAT_PRODUCT) *.o
+
+$(LIB_GF)/analysisWeighting.o : $(SRC_GF)/analysisWeighting.cpp $(INC_GF)/analysisWeighting.h
+	$(CXX) $(CXXFLAGS) $(SRC_GF)/analysisWeighting.cpp -c -o $(LIB_GF)/analysisWeighting.o
+
+$(LIB_GF)/GollumParameters.o : $(SRC_GF)/GollumParameters.cpp $(INC_GF)/GollumParameters.h
+	$(CXX) $(CXXFLAGS) $(SRC_GF)/GollumParameters.cpp -c -o $(LIB_GF)/GollumParameters.o
+
+$(LIB_GF)/compactIO.o : $(INC_GF)/compactIO.h $(SRC_GF)/compactIO.cpp $(INC_GF)/Event.h $(INC_GF)/analysisWeighting.h
+	$(CXX) $(CXXFLAGS) $(SRC_GF)/compactIO.cpp -c -o $(LIB_GF)/compactIO.o
+
+$(LIB_GF)/Event.o : $(SRC_GF)/Event.cpp $(INC_GF)/Event.h
+	$(CXX) $(CXXFLAGS) $(SRC_GF)/Event.cpp -c -o $(LIB_GF)/Event.o
+
+$(LIB_GF)/GollumTools.o : $(SRC_GF)/GollumTools.cpp $(INC_GF)/GollumTools.h
+	$(CXX) $(CXXFLAGS) $(SRC_GF)/GollumTools.cpp -c -o $(LIB_GF)/GollumTools.o
+
+$(LIB_GF)/GollumEnumDefinitions.o : $(SRC_GF)/GollumEnumDefinitions.cpp $(INC_GF)/GollumEnumDefinitions.h
+	$(CXX) $(CXXFLAGS) $(SRC_GF)/GollumEnumDefinitions.cpp -c -o $(LIB_GF)/GollumEnumDefinitions.o
+
+$(LIB_GF)/utils.o : $(SRC_GF)/utils.cpp $(INC_GF)/utils.h
+	$(CXX) $(CXXFLAGS) $(SRC_GF)/utils.cpp -c -o $(LIB_GF)/utils.o
+
+$(LIB_GF)/GollumFit.o : $(SRC_GF)/GollumFit.cpp $(INC_GF)/Event.h $(INC_GF)/analysisWeighting.h $(INC_GF)/compactIO.h $(INC_GF)/GollumFit.h $(INC_GF)/GollumParameters.h $(INC_GF)/GollumEnumDefinitions.h $(INC_GF)/FastMode.h
+	$(CXX) $(CXXFLAGS) $(SRC_GF)/GollumFit.cpp -c -o $(LIB_GF)/GollumFit.o
+
+$(DYN_PRODUCT) : $(OBJECTS)
+	@echo Linking dynamic library $(DYN_PRODUCT)
+	@mkdir -p $(LIB_GF)/lib/
+	@$(CXX) $(DYN_OPT)  $(LDFLAGS) -o $(DYN_PRODUCT) $(OBJECTS)
+
+$(STAT_PRODUCT) : $(OBJECTS)
+	@echo Linking static library $(STAT_PRODUCT)
+	@mkdir -p $(LIB_GF)/lib/
+	@$(AR) -rcs $(STAT_PRODUCT) $(OBJECTS)
+
+install: $(DYN_PRODUCT) $(STAT_PRODUCT)
+	@echo Installing headers in $(PREFIX)/include/GollumFit
+	@mkdir -p $(PREFIX)/include/GollumFit
+	@cp $(HEADERS) $(PREFIX)/include/GollumFit
+	@echo Installing libraries in $(PREFIX)/lib
+	@mkdir -p $(PREFIX)/lib
+	@cp $(DYN_PRODUCT) $(STAT_PRODUCT) $(PREFIX)/lib
+	@echo Installing config information in $(PREFIX)/lib/pkgconfig
+	@mkdir -p $(PREFIX)/lib/pkgconfig
+	@cp lib/gollumfit.pc $(PREFIX)/lib/pkgconfig
+' >> ./Makefile
+
+echo '
+uninstall:
+	@echo Removing headers from $(PREFIX)/include/GollumFit
+	@rm -rf $(PREFIX)/include/GollumFit
+	@echo Removing libraries from $(PREFIX)/lib
+	@rm -f $(PREFIX)/$(DYN_PRODUCT)
+	@rm -f $(PREFIX)/$(STAT_PRODUCT)
+	@echo Removing config information from $(PREFIX)/lib/pkgconfig
+	@rm -f $(PREFIX)/lib/pkgconfig/gollumfit.pc
+' >> ./Makefile
+
+echo "Configure complete. Run 'make' to build."
