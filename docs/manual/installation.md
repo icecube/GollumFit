@@ -47,8 +47,9 @@ export HDF5_DISABLE_VERSION_CHECK=1
 mkdir $GOLLUMBUILDPATH
 mkdir $PREFIX/bin $PREFIX/include $PREFIX/lib $PREFIX/lib64
 ```
+For the Boost dependency, ensure that library and header directories are at the location `$BOOST_DIR`.
 
-Check out the necessary code, including necessary submodules:
+Now check out the necessary code, including necessary submodules:
 ```
 cd $GOLLUMSOURCEPATH
 git clone https://github.com/icecube/GollumFit
@@ -56,7 +57,7 @@ cd GollumFit
 git submodule update --init --recursive
 ```
 
-Compile the required software, one-by-one: 
+Compile the required software, one-by-one ():  
 ```
 # SQuIDS
 cd $GOLLUMSOURCEPATH/GollumFit/vendor/SQuIDS
@@ -66,7 +67,7 @@ make install
 
 # nuSQuIDS
 cd $GOLLUMSOURCEPATH/GollumFit/vendor/nuSQuIDS
-./configure --prefix=$PREFIX --with-squids=$PREFIX --with-python-bindings --with-boost=${SROOT}
+./configure --prefix=$PREFIX --with-squids=$PREFIX --with-python-bindings --with-boost=$BOOST_DIR
 make
 make python
 make install
@@ -74,13 +75,13 @@ make install
 # PhysTools
 cd $GOLLUMSOURCEPATH/GollumFit/vendor/PhysTools
 mkdir build build/lbfgsb
-./configure --with-boost=${SROOT} --prefix=$PREFIX
+./configure --with-boost=$BOOST_DIR --prefix=$PREFIX
 make
 make install
 
 # LeptonWeighter
 cd $GOLLUMSOURCEPATH/GollumFit/vendor/LeptonWeighter
-./configure --prefix=$PREFIX --with-boost=${SROOT}
+./configure --prefix=$PREFIX --with-boost=$BOOST_DIR
 make
 make install
 ```
@@ -88,6 +89,7 @@ make install
 Now, compile GollumFit itself:
 ```
 cd $GOLLUMSOURCEPATH/GollumFit
+./configure --prefix=$PREFIX --with-boost=$BOOST_DIR
 make
 make install
 ```
