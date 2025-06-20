@@ -768,8 +768,8 @@ endif
 # Project files
 NAME=GollumFit
 VERSION=1.0.0
-STAT_PRODUCT:=$(LIB_GF)/lib/lib$(NAME).a
-DYN_PRODUCT:=$(LIB_GF)/lib/lib$(NAME)$(DYN_SUFFIX)
+STAT_PRODUCT:=$(LIB_GF)/lib$(NAME).a
+DYN_PRODUCT:=$(LIB_GF)/lib$(NAME)$(DYN_SUFFIX)
 OBJECTS = $(addprefix $(LIB_GF)/, $(GOLLUM_HELPER_OBJECTS))
 
 # Compilation rules
