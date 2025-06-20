@@ -629,7 +629,7 @@ Name: GollumFit
 Description: Diffuse fitter.
 URL: https://github.com/icecube/GollumFit
 Version: 1.0.0
-Requires: gsl >= 1.15 hdf5 >= 1.8 squids >= 1.2.0 nusquids >= 1.10.1 phystools >= 0.0.1 leptonweighter >= 0.0.1 photospline >= 0.0.1 cfitsio >= 3.47 boost >= 1.65
+Requires: gsl >= 1.15 hdf5 >= 1.8 squids >= 1.2.0 nusquids >= 1.10.1 phystools >= 0.0.1 leptonweighter >= 0.0.1 cfitsio >= 3.47
 Libs: -L${libdir}/lib -lGollumFit
 Cflags: -I${includedir}/GollumFit
 ' >> lib/gollumfit.pc
