@@ -1,11 +1,10 @@
-#include <boost/python.hpp>
-#include <boost/python/scope.hpp>
-#include <boost/python/to_python_converter.hpp>
-#include <boost/python/suite/indexing/vector_indexing_suite.hpp>
-#include <boost/python/suite/indexing/map_indexing_suite.hpp>
-#include <boost/python/overloads.hpp>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h> 
+#include <pybind11/numpy.h>
+#include <pybind11/functional.h>
+#include <pybind11/complex.h>
+
 #include <functional>
-#include "container_conversions.h"
 #include "GollumFit.h"
 
 #include <numpy/ndarrayobject.h>
@@ -14,264 +13,113 @@
 
 #include <nuSQuIDS/marray.h>
 
-using namespace boost::python;
-namespace bp = boost::python;
+using namespace pybind11;
+namespace py = pybind11;
 namespace GF = gollumfit;
 namespace nsq = nusquids;
 
-template<class T>
-struct VecToList
-{
-  static PyObject* convert(const std::vector<T>& vec){
-    boost::python::list* l = new boost::python::list();
-    for(size_t i =0; i < vec.size(); i++)
-      (*l).append(vec[i]);
+namespace pybind11 { namespace detail {
+    template <unsigned int Dim>
+    struct type_caster<nsq::marray<double, Dim>> {
+    private:
+        using T = nsq::marray<double, Dim>;
+    public:
+        PYBIND11_TYPE_CASTER(T, _("marray<double,Dim>"));
 
-    return l->ptr();
-  }
-};
+        // Python -> C++
+        bool load(handle src, bool) {
+            if (!py::isinstance<py::array>(src))
+                return false;
 
-template<class T>
-struct DeqToList
-{
-  static PyObject* convert(const std::deque<T>& vec){
-    boost::python::list* l = new boost::python::list();
-    for(size_t i =0; i < vec.size(); i++)
-      (*l).append(vec[i]);
+            auto array = py::array::ensure(src);
+            if (!array || array.ndim() != Dim || !py::isinstance<py::array_t<double>>(array))
+                return false;
 
-    return l->ptr();
-  }
-};
+            std::array<size_t, Dim> shape;
+            for (size_t i = 0; i < Dim; ++i)
+                shape[i] = static_cast<size_t>(array.shape(i));
 
-void ListToVec(std::vector<unsigned int> &ret, bp::list l){
-  for(int i=0;i<bp::len(l);i++)
-    ret.push_back(bp::extract<unsigned int>(l[i]));
-}
+            double* ptr = static_cast<double*>(array.mutable_data());
+            if (!ptr)
+                return false;
 
-// converting marray to numpy array and back
-template<unsigned int DIM>
-struct marray_to_numpyarray {
-  static PyObject* convert( nsq::marray<double,DIM> const & iarray){
-    // get the data from the marray
-    double * data = iarray.size() ? const_cast<double*>(iarray.get_data()) : static_cast<double*>(NULL);
-    // construct numpy object
-    npy_intp size[DIM];
-    for(unsigned int i = 0; i < DIM; i++)
-      size[i] = iarray.extent(i);
-    PyArrayObject * pyObj = (PyArrayObject*) PyArray_SimpleNew(DIM,size,PyArray_DOUBLE);
-    memcpy(pyObj->data, data, sizeof(double) * iarray.size());
-
-    return PyArray_Return(pyObj);
-  }
-};
-
-template<typename T,unsigned int DIM>
-static nsq::marray<T,DIM> numpyarray_to_marray(PyObject * iarray, NPY_TYPES type_num){
-  // es un array de numpy
-  if (! PyArray_Check(iarray) )
-  {
-    PyErr_SetString(PyExc_TypeError, "numpyarray_to_marray: Input is not a numpy array.");
-    boost::python::throw_error_already_set();
-  }
-  // si es que fuera un array de numpy castearlo
-  //PyArrayObject* numpy_array = (PyArrayObject*) iarray;
-  // lets get the contiguos C-style array
-  PyArrayObject* numpy_array = PyArray_GETCONTIGUOUS((PyArrayObject*)iarray);
-
-  // revisemos que los tipos del array sean dobles o que
-  if ( PyArray_DESCR(numpy_array)->type_num != type_num )
-  {
-    if ( PyArray_DESCR(numpy_array)->type_num == NPY_LONG &&
-         PyArray_ITEMSIZE(numpy_array) == 4 && type_num == NPY_INT)
-    {
-      // numpy on 32 bits sets numpy.int32 to NPY_LONG. So its all ok.
-    }
-    else
-    {
-      PyErr_SetString(PyExc_TypeError, "numpyarray_to_marray: numpy type is not the same as the input array type.");
-      boost::python::throw_error_already_set();
-    }
-  }
-
-  // arrays vacios
-  if (PyArray_SIZE(numpy_array) == 0){
-      PyErr_SetString(PyExc_TypeError,"numpyarray_to_marray: empty numpy array.");
-      boost::python::throw_error_already_set();
-  }
-
-  // create numpy iterator
-  NpyIter* iter = NpyIter_New(numpy_array, NPY_ITER_READONLY|
-                             NPY_ITER_EXTERNAL_LOOP|
-                             NPY_ITER_REFS_OK,
-                             NPY_KEEPORDER, NPY_NO_CASTING,
-                             NULL);
-
-  unsigned int array_dim = PyArray_NDIM(numpy_array);
-  assert(DIM == array_dim && "No matching dimensions.");
-
-  // get numpy array shape and create marray object
-#ifdef NPY_1_7_API_VERSION
-  npy_intp* array_shape = PyArray_SHAPE(numpy_array);
-#else
-  npy_intp* array_shape = PyArray_DIMS(numpy_array);
-#endif
-  std::vector<size_t> dimensions;
-  for(unsigned int i = 0; i < array_dim; i++)
-    dimensions.push_back(array_shape[i]);
-
-  // construct output object
-  nsq::marray<T,DIM> oarray;
-  oarray.resize(dimensions);
-  auto it = oarray.begin();
-
-  NpyIter_IterNextFunc *iternext = NpyIter_GetIterNext(iter, NULL);
-  char** dataptr = NpyIter_GetDataPtrArray(iter);
-  npy_intp* strideptr = NpyIter_GetInnerStrideArray(iter);
-  npy_intp* sizeptr = NpyIter_GetInnerLoopSizePtr(iter);
-  npy_intp iop, nop = NpyIter_GetNOp(iter);
-
-  // magic to make the int work
-  bool magic = false;
-  if ( type_num == NPY_INT or type_num == NPY_LONG )
-    magic = true;
-
-  do{
-    char* data = *dataptr;
-    npy_intp count = *sizeptr;
-    npy_intp stride = *strideptr;
-
-    while (count--)
-    {
-      for (iop = 0; iop < nop; ++iop, data+=stride){
-        if (magic)
-          *it++ = *(T*)(reinterpret_cast<int*>(data));
-        else
-          *it++ = *(T*)(data);
-      }
-    }
-  } while(iternext(iter));
-
-  NpyIter_Deallocate(iter);
-
-  return oarray;
-}
-
-template<typename key_t, typename val_t>
-struct Dict2Map {
-
-    /// The type of the map we convert the Python dict into
-    typedef std::map<key_t, val_t> map_t;
-
-    /// constructor
-    /// registers the converter with the Boost.Python runtime
-    Dict2Map() {
-        bp::converter::registry::push_back(
-            &convertible,
-            &construct,
-            bp::type_id<map_t>()
-#ifdef BOOST_PYTHON_SUPPORTS_PY_SIGNATURES
-            , &bp::converter::wrap_pytype<&PyDict_Type>::get_pytype
-#endif
-        );
-    }
-
-    /// Check if conversion is possible
-    static void* convertible(PyObject* objptr) {
-        return PyDict_Check(objptr)? objptr: nullptr;
-    }
-
-    /// Perform the conversion
-    static void construct(
-        PyObject* objptr,
-        bp::converter::rvalue_from_python_stage1_data* data
-    ) {
-        // convert the PyObject pointed to by `objptr` to a bp::dict
-        bp::handle<> objhandle{ bp::borrowed(objptr) };   // "smart ptr"
-        bp::dict d{ objhandle };
-
-        // get a pointer to memory into which we construct the map
-        // this is provided by the Python runtime
-        void* storage =
-            reinterpret_cast<
-                bp::converter::rvalue_from_python_storage<map_t>*
-            >(data)->storage.bytes;
-
-        // placement-new allocate the result
-        new(storage) map_t{};
-
-        // iterate over the dictionary `d`, fill up the map `m`
-        //map_t& m;
-        //m = *(static_cast<map_t *>(storage));
-        map_t& m = *(static_cast<map_t *>(storage));
-        bp::list keys{ d.keys() };
-        int keycount{ static_cast<int>(bp::len(keys)) };
-        for (int i = 0; i < keycount; ++i) {
-            // get the key
-            bp::object keyobj{ keys[i] };
-            bp::extract<key_t> keyproxy{ keyobj };
-            if (! keyproxy.check()) {
-                PyErr_SetString(PyExc_KeyError, "Bad key type");
-                bp::throw_error_already_set();
-            }
-            key_t key = keyproxy();
-
-            // get the corresponding value
-            bp::object valobj{ d[keyobj] };
-            bp::extract<val_t> valproxy{ valobj };
-            if (! valproxy.check()) {
-                PyErr_SetString(PyExc_ValueError, "Bad value type");
-                bp::throw_error_already_set();
-            }
-            val_t val = valproxy();
-            m[key] = val;
+            value = T();
+            value.resize(shape);
+            std::memcpy(value.get_data(), array.data(), sizeof(double) * array.size());
+            return true;
         }
 
-        // remember the location for later
-        data->convertible = storage;
-    }
-};
+        // C++ -> Python
+        static handle cast(const nsq::marray<double, Dim>& arr, return_value_policy, handle parent) {
+            std::vector<ssize_t> shape(Dim);
+            std::vector<ssize_t> strides(Dim);
+
+            ssize_t stride = sizeof(double);
+            for (ssize_t i = Dim - 1; i >= 0; --i) {
+                shape[i] = arr.extent(i);
+                strides[i] = stride;
+                stride *= shape[i];
+            }
+
+            return py::array(py::buffer_info(
+                const_cast<double*>(arr.get_data()), // assume mutable data
+                sizeof(double),
+                py::format_descriptor<double>::format(),
+                Dim,
+                shape,
+                strides
+            )).release();
+        }
+    };
+}} // namespace pybind11::detail
+
 
 // auxiliary wrapper functions // evil // Carlos
 
-static double wrap_SetData(GF::GollumFit* st, PyObject * array){
-  if (! PyArray_Check(array) )
-  {
-    throw std::runtime_error("GollumFit::Error:Input array is not a numpy array.");
-  }
+// static double wrap_SetData(GF::GollumFit* st, PyObject * array){
+//   if (! PyArray_Check(array) )
+//   {
+//     throw std::runtime_error("GollumFit::Error:Input array is not a numpy array.");
+//   }
 
-  PyArrayObject* numpy_array = (PyArrayObject*)array;
-  unsigned int array_dim = PyArray_NDIM(numpy_array);
-  NPY_TYPES type = (NPY_TYPES) PyArray_DESCR(numpy_array)->type_num;
+//   PyArrayObject* numpy_array = (PyArrayObject*)array;
+//   unsigned int array_dim = PyArray_NDIM(numpy_array);
+//   NPY_TYPES type = (NPY_TYPES) PyArray_DESCR(numpy_array)->type_num;
 
-  // things i think can cast ok to doubles
-  if (!( type == NPY_LONG or type == NPY_INT or type == NPY_SHORT or type == NPY_FLOAT or
-      type == NPY_DOUBLE or type == NPY_LONGDOUBLE or type == NPY_CFLOAT or type == NPY_CDOUBLE))
-    throw std::runtime_error("GollumFit::Error:Input numpy array cannot be meaninfully casted into double.");
+//   // things i think can cast ok to doubles
+//   if (!( type == NPY_LONG or type == NPY_INT or type == NPY_SHORT or type == NPY_FLOAT or
+//       type == NPY_DOUBLE or type == NPY_LONGDOUBLE or type == NPY_CFLOAT or type == NPY_CDOUBLE))
+//     throw std::runtime_error("GollumFit::Error:Input numpy array cannot be meaninfully casted into double.");
 
-  if ( array_dim == 2 ) {
-    nsq::marray<double,2> state = numpyarray_to_marray<double,2>(array, type);
-    double value = st->SetData(state);
-    return value;
-  } else
-    throw std::runtime_error("GollumFit::Input array has wrong dimenions.");
-}
+//   if ( array_dim == 2 ) {
+//     nsq::marray<double,2> state = numpyarray_to_marray<double,2>(array, type);
+//     double value = st->SetData(state);
+//     return value;
+//   } else
+//     throw std::runtime_error("GollumFit::Input array has wrong dimenions.");
+// }
 
 
-static Dict2Map<unsigned int, double> reg{};
+//static Dict2Map<unsigned int, double> reg{};
 
-BOOST_PYTHON_MODULE(GollumFitPy)
+PYBIND11_MODULE(GollumFitPy, m)
 {
-  // import numpy array definitions
-  import_array();
-  import_ufunc();
+  m.doc() = "Python bindings for GollumFit via pybind11";
 
-  enum_<GF::FluxComponent>("FluxComponent")
+  // m.def("marray_to_numpy1", &marray_to_numpy<1>);
+  // m.def("marray_to_numpy2", &marray_to_numpy<2>);
+  // m.def("marray_to_numpy3", &marray_to_numpy<3>);
+  // m.def("numpy_to_marray1", &numpy_to_marray<1>);
+
+  py::enum_<GF::FluxComponent>(m, "FluxComponent")
     .value("atmConv",GF::FluxComponent::atmConv)
     .value("atmPrompt",GF::FluxComponent::atmPrompt)
     .value("diffuseAstro",GF::FluxComponent::diffuseAstro)
+    .export_values()
   ;
 
-  class_<GF::FitResult, std::shared_ptr<GF::FitResult> >("FitResult",init<>())
+  py::class_<GF::FitResult, std::shared_ptr<GF::FitResult> >(m, "FitResult")
+    .def(py::init<>())
     .def_readwrite("params",&GF::FitResult::params)
     .def_readwrite("likelihood",&GF::FitResult::likelihood)
     .def_readwrite("aux_likelihood",&GF::FitResult::aux_likelihood)
@@ -280,9 +128,12 @@ BOOST_PYTHON_MODULE(GollumFitPy)
     .def_readwrite("succeeded",&GF::FitResult::succeeded)
   ;
 
-  class_<GF::hist_marray>("hist_marray");
+  py::class_<GF::hist_marray>(m, "hist_marray")
+    .def(py::init<>())
+  ;
 
-  class_<GF::DataPaths, boost::noncopyable,std::shared_ptr<GF::DataPaths> >("DataPaths",init<>())
+  py::class_<GF::DataPaths,std::shared_ptr<GF::DataPaths> >(m, "DataPaths")
+    .def(py::init<>())
     .def_readwrite("compact_file_path",&GF::DataPaths::compact_file_path)
     .def_readwrite("neutrino_cc_xs_spline_path",&GF::DataPaths::neutrino_cc_xs_spline_path)
     .def_readwrite("antineutrino_cc_xs_spline_path",&GF::DataPaths::antineutrino_cc_xs_spline_path)
@@ -307,7 +158,8 @@ BOOST_PYTHON_MODULE(GollumFitPy)
     .def_readwrite("cosmic_ray_spline_path",&GF::DataPaths::cosmic_ray_spline_path)
   ;
 
-  class_<GF::SteeringParams, boost::noncopyable,std::shared_ptr<GF::SteeringParams> >("SteeringParams",init<>())
+  py::class_<GF::SteeringParams ,std::shared_ptr<GF::SteeringParams> >(m, "SteeringParams")
+    .def(py::init<>())
     .def_readwrite("minFitEnergy",&GF::SteeringParams::minFitEnergy, "Minimum energy in the fit")
     .def_readwrite("maxFitEnergy",&GF::SteeringParams::maxFitEnergy, "Maximum energy in the fit")
     .def_readwrite("minCosth",&GF::SteeringParams::minCosth)
@@ -332,7 +184,8 @@ BOOST_PYTHON_MODULE(GollumFitPy)
   ;
 
 
-  class_<GF::FitParameters, boost::noncopyable,std::shared_ptr<GF::FitParameters> >("FitParameters",init<>())
+  py::class_<GF::FitParameters, std::shared_ptr<GF::FitParameters> >(m, "FitParameters")
+    .def(py::init<>())
     .def_readwrite("convNorm",&GF::FitParameters::convNorm)
     .def_readwrite("promptNorm",&GF::FitParameters::promptNorm)
     .def_readwrite("zenithCorrection",&GF::FitParameters::zenithCorrection)
@@ -373,7 +226,8 @@ BOOST_PYTHON_MODULE(GollumFitPy)
     .def_readwrite("nubarxs",&GF::FitParameters::nubarxs)
   ;
 
-  class_<GF::FitParametersBound, boost::noncopyable,std::shared_ptr<GF::FitParametersBound> >("FitParametersBound",init<>())
+  py::class_<GF::FitParametersBound, std::shared_ptr<GF::FitParametersBound> >(m, "FitParametersBound")
+    .def(py::init<>())
     .def_readwrite("convNormMin",&GF::FitParametersBound::convNormMin)
     .def_readwrite("convNormMax",&GF::FitParametersBound::convNormMax)    
     .def_readwrite("promptNormMin",&GF::FitParametersBound::promptNormMin)
@@ -452,8 +306,8 @@ BOOST_PYTHON_MODULE(GollumFitPy)
     .def_readwrite("nubarxsMax",&GF::FitParametersBound::nubarxsMax)    
   ;
 
-  class_<GF::FitParametersFlag, boost::noncopyable,std::shared_ptr<GF::FitParametersFlag> >("FitParametersFlag",init<>())
-    .def(init<bool>())
+  py::class_<GF::FitParametersFlag, std::shared_ptr<GF::FitParametersFlag> >(m, "FitParametersFlag")
+    .def(py::init<bool>())
     .def_readwrite("convNorm",&GF::FitParametersFlag::convNorm)
     .def_readwrite("promptNorm",&GF::FitParametersFlag::promptNorm)
     .def_readwrite("zenithCorrection",&GF::FitParametersFlag::zenithCorrection)
@@ -494,7 +348,8 @@ BOOST_PYTHON_MODULE(GollumFitPy)
     .def_readwrite("nubarxs",&GF::FitParametersFlag::nubarxs)
   ;
 
-  class_<GF::Priors, boost::noncopyable,std::shared_ptr<GF::Priors> >("Priors",init<>())
+  py::class_<GF::Priors, std::shared_ptr<GF::Priors> >(m, "Priors")
+    .def(py::init<>())
     .def_readwrite("convNormCenter",&GF::Priors::convNormCenter)
     .def_readwrite("convNormWidth",&GF::Priors::convNormWidth) 
     .def_readwrite("convNormCenter",&GF::Priors::convNormCenter)
@@ -576,7 +431,8 @@ BOOST_PYTHON_MODULE(GollumFitPy)
     .def("SetIceGradientsCorr",&GF::Priors::SetIceGradientsCorr)
  ;
 
-  class_<GF::GollumFit, boost::noncopyable, std::shared_ptr<GF::GollumFit> >("GollumFit", init<GF::DataPaths,GF::SteeringParams>())
+  py::class_<GF::GollumFit, std::shared_ptr<GF::GollumFit> >(m, "GollumFit")
+    .def(py::init<GF::DataPaths, GF::SteeringParams>())
     .def("ReConfig",&GF::GollumFit::ReConfig<false>)
     .def("CheckDataLoaded",&GF::GollumFit::CheckDataLoaded)
     .def("CheckSimulationLoaded",&GF::GollumFit::CheckSimulationLoaded)
@@ -604,7 +460,7 @@ BOOST_PYTHON_MODULE(GollumFitPy)
     .def("GetExpectationEvents",(nsq::marray<double,2>(GF::GollumFit::*)(GF::FitParameters)const)&GF::GollumFit::GetExpectationEvents)
     .def("CheckExpectation",(int(GF::GollumFit::*)(GF::FitParameters)const)&GF::GollumFit::CheckExpectation)
     .def("EvalLLH",(double(GF::GollumFit::*)(GF::FitParameters,bool)const)&GF::GollumFit::EvalLLH)
-    .def("SetData",wrap_SetData)
+    .def("SetData", &GF::GollumFit::SetData)
     .def("MinLLH",(GF::FitResult(GF::GollumFit::*)() const)&GF::GollumFit::MinLLH)
     .def("SetFitParametersSeed",(void(GF::GollumFit::*)(std::vector<GF::FitParameters>))&GF::GollumFit::SetFitParametersSeed)
     .def("SetFitParametersFlag",&GF::GollumFit::SetFitParametersFlag)
@@ -612,7 +468,7 @@ BOOST_PYTHON_MODULE(GollumFitPy)
     .def("SetFitParametersPriors",&GF::GollumFit::SetFitParametersPriors)
   ;
 
-  enum_<LW::ParticleType>("ParticleType")
+  py::enum_<LW::ParticleType>(m, "ParticleType")
     .value("NuE",LW::ParticleType::NuE)
     .value("NuMu",LW::ParticleType::NuMu)
     .value("NuTau",LW::ParticleType::NuTau)
@@ -629,10 +485,13 @@ BOOST_PYTHON_MODULE(GollumFitPy)
 
     .value("unknown",LW::ParticleType::unknown)
     .value("Hadrons",LW::ParticleType::Hadrons)
+
+    .export_values()
   ;
 
-  class_<Event, std::shared_ptr<Event> >("Event", init<>())
+  py::class_<Event, std::shared_ptr<Event> >(m, "Event")
     // MC Truth properties
+    .def(py::init<>())
     .def_readonly("final_state_particle_0",&Event::final_state_particle_0)
     .def_readonly("final_state_particle_1",&Event::final_state_particle_1)
     .def_readonly("primaryType",&Event::primaryType)
@@ -647,27 +506,8 @@ BOOST_PYTHON_MODULE(GollumFitPy)
     .def_readonly("zenith",&Event::zenith)
   ;
 
-  // python container to vector<double> convertion
-  using namespace scitbx::boost_python::container_conversions;
-  from_python_sequence< std::vector<double>, variable_capacity_policy >();
-  to_python_converter< std::vector<double, class std::allocator<double> >, VecToList<double> > ();
-  from_python_sequence< std::vector<int>, variable_capacity_policy >();
-  to_python_converter< std::vector<int, class std::allocator<int> >, VecToList<int> > ();
-  from_python_sequence< std::vector<unsigned int>, variable_capacity_policy >();
-  to_python_converter< std::vector<unsigned int, class std::allocator<unsigned int> >, VecToList<unsigned int> > ();
-
-  from_python_sequence< std::deque<Event>, variable_capacity_policy >();
-  to_python_converter< std::deque<Event, class std::allocator<Event> >, DeqToList<Event> > ();
-
-  from_python_sequence< std::vector<GF::FitParameters>, variable_capacity_policy >();
-  to_python_converter< std::vector<GF::FitParameters, class std::allocator<GF::FitParameters> >, VecToList<GF::FitParameters> > ();
-
-  from_python_sequence< std::vector<string>, variable_capacity_policy >();
-  to_python_converter< std::vector<string, class std::allocator<string> >, VecToList<string> > ();
-
-  to_python_converter< nsq::marray<double,1> , marray_to_numpyarray<1> >();
-  to_python_converter< nsq::marray<double,2> , marray_to_numpyarray<2> >();
-  to_python_converter< nsq::marray<double,3> , marray_to_numpyarray<3> >();
-  to_python_converter< GF::hist_marray , marray_to_numpyarray<3> >();
-
+  // to_python_converter< nsq::marray<double,1> , marray_to_numpy<1> >();
+  // to_python_converter< nsq::marray<double,2> , marray_to_numpy<2> >();
+  // to_python_converter< nsq::marray<double,3> , marray_to_numpy<3> >();
+  // to_python_converter< GF::hist_marray , marray_to_numpy<3> >();
 }
