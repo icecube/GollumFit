@@ -19,6 +19,7 @@ The following tools and libraries must be available on your system. Where releva
 * `pthread`
 * `photospline` (https://github.com/cnweaver/photospline)
 * `cfitsio` (https://heasarc.gsfc.nasa.gov/fitsio/)
+* `pybind11` (for Python bindings; highly recommended)
 
 To access these tools and libraries, IceCube users should use the `cvmfs`:
 ```
@@ -57,7 +58,7 @@ cd GollumFit
 git submodule update --init --recursive
 ```
 
-Compile the required software, one-by-one ():  
+Compile the required software, one-by-one:  
 ```
 # SQuIDS
 cd $GOLLUMSOURCEPATH/GollumFit/vendor/SQuIDS

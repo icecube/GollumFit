@@ -155,7 +155,7 @@ try_find_boost(){
 	if [ "$PYTHON_FOUND" ]; then
 		PYV=`${PYTHON_EXE} -c 'import sys; print(str(sys.version_info.major)+str(sys.version_info.minor))'`
 		PYVM=`${PYTHON_EXE} -c 'import sys; print(sys.version_info.major)'`
-		echo "Looking for $PKG built for python ${PYV} in $GUESS_DIR..."
+		# echo "Looking for $PKG built for python ${PYV} in $GUESS_DIR..."
 	else
 		echo "Looking for $PKG in $GUESS_DIR..."
 	fi
@@ -172,24 +172,24 @@ try_find_boost(){
 		echo "Wrong number of arguments to try_find_boost"
 		return
  	fi
-	if [ "$PYTHON_FOUND" ]; then
-		for PYV_SUFFIX in $PYV $PYVM $PYV-mt $PYVM-mt ''; do
-			for BOOST_LIBDIR in $POSSIBLE_BOOST_LIBDIRS; do
-				if [ -d $BOOST_LIBDIR -a \( -e $BOOST_LIBDIR/libboost_python${PYV_SUFFIX}.a -o -e $BOOST_LIBDIR/libboost_python${PYV_SUFFIX}.so -o -e $BOOST_LIBDIR/libboost_python${PYV_SUFFIX}.dylib \) ]; then
-					if [ ! "$PYV_SUFFIX" ]; then
-						echo " Found boost_python with no python version tag; hoping it is compatible"
-					fi
-					BOOST_PYTHON_FOUND=1
-					BOOST_PYTHON_LDFLAGS="-lboost_python${PYV_SUFFIX}"
-					break
-				fi
-			done
-			if [ "$BOOST_PYTHON_FOUND" ]; then break; fi
-		done
-		if [ ! "$BOOST_PYTHON_FOUND" ]; then
-			echo " Unable to locate the boost_python library in $GUESS_DIR"
-		fi
-	fi
+	# if [ "$PYTHON_FOUND" ]; then
+	# 	for PYV_SUFFIX in $PYV $PYVM $PYV-mt $PYVM-mt ''; do
+	# 		for BOOST_LIBDIR in $POSSIBLE_BOOST_LIBDIRS; do
+	# 			if [ -d $BOOST_LIBDIR -a \( -e $BOOST_LIBDIR/libboost_python${PYV_SUFFIX}.a -o -e $BOOST_LIBDIR/libboost_python${PYV_SUFFIX}.so -o -e $BOOST_LIBDIR/libboost_python${PYV_SUFFIX}.dylib \) ]; then
+	# 				if [ ! "$PYV_SUFFIX" ]; then
+	# 					echo " Found boost_python with no python version tag; hoping it is compatible"
+	# 				fi
+	# 				BOOST_PYTHON_FOUND=1
+	# 				BOOST_PYTHON_LDFLAGS="-lboost_python${PYV_SUFFIX}"
+	# 				break
+	# 			fi
+	# 		done
+	# 		if [ "$BOOST_PYTHON_FOUND" ]; then break; fi
+	# 	done
+	# 	if [ ! "$BOOST_PYTHON_FOUND" ]; then
+	# 		echo " Unable to locate the boost_python library in $GUESS_DIR"
+	# 	fi
+	# fi
 	for BOOST_INCDIR in $POSSIBLE_BOOST_INCDIRS; do
 		if [ -d $BOOST_INCDIR -a -e $BOOST_INCDIR/boost/version.hpp ]; then
 			break
@@ -576,9 +576,9 @@ if [ -z $BOOST_INCDIR ]; then
   exit 1
 fi
 
-if [ "$BOOST_PYTHON_FOUND" != 1 ]; then
-	echo "*** Failed to find Boost Python; Python bindings will not be built ***"
-fi
+# if [ "$BOOST_PYTHON_FOUND" != 1 ]; then
+# 	echo "*** Failed to find Boost Python; Python bindings will not be built ***"
+# fi
 
 ensure_found squids
 ensure_found nusquids
@@ -602,6 +602,11 @@ OLDPWD=`pwd`
 cd "$PREFIX"
 PREFIX=`pwd`
 cd "$OLDPWD"
+
+if [ "$(uname -s)" = "Darwin" ] && [ "$(uname -m)" = "arm64" ]; then
+    export DYLD_LIBRARY_PATH="$PREFIX/lib${DYLD_LIBRARY_PATH+:$DYLD_LIBRARY_PATH}"
+    echo "Set DYLD_LIBRARY_PATH to include $PREFIX/lib for Apple Silicon (arm64 macOS)"
+fi
 
 ###################################################################################################
 # generate pkg-config file
@@ -716,7 +721,7 @@ echo "HDF5_LDFLAGS=$HDF5_LDFLAGS" >> ./Makefile
 if [ "$BOOST_PYTHON_FOUND" ]; then
 	echo "PYTHON_CFLAGS=$PYTHON_CFLAGS" >> ./Makefile
 	echo "PYTHON_LDFLAGS=$PYTHON_LDFLAGS" >> ./Makefile
-	echo "BOOST_PYTHON_LDFLAGS=$BOOST_PYTHON_LDFLAGS" >> ./Makefile
+	# echo "BOOST_PYTHON_LDFLAGS=$BOOST_PYTHON_LDFLAGS" >> ./Makefile
 	echo "PYTHON_MODULEDIR=$PYTHON_MODULEDIR" >> ./Makefile
 fi
 
@@ -836,5 +841,30 @@ uninstall:
 	@echo Removing config information from $(PREFIX)/lib/pkgconfig
 	@rm -f $(PREFIX)/lib/pkgconfig/gollumfit.pc
 ' >> ./Makefile
+
+if [ "$PYTHON_BINDINGS" ]; then
+	echo '
+
+python : $(PYTHON_LIB)
+
+$(PYTHON_LIB) : build/nuSQUIDSpy.o $(STAT_PRODUCT)
+	@echo Linking python bindings
+	@$(CXX) $(DYN_OPT_PY) build/nuSQUIDSpy.o -Llib -l$(NAME) $(LDFLAGS) $(PYTHON_LDFLAGS) -o $(PYTHON_LIB)
+
+build/nuSQUIDSpy.o : resources/python/src_pybind/nuSQUIDSpy.cpp
+	@echo Compiling python bindings
+	@$(CXX) $(CXXFLAGS) -c $(PYTHON_CFLAGS) $(NUMPY_CFLAGS) $(CFLAGS) $< -o $@
+
+python-install : $(PYTHON_LIB)
+	@echo Installing python module in $(PYTHON_MODULEDIR)
+	@mkdir -p $(PYTHON_MODULEDIR)
+	@cp $(PYTHON_LIB) $(PYTHON_MODULEDIR)
+
+python-uninstall : $(PYTHON_LIB)
+	@echo Removing python module from $(PYTHON_MODULEDIR)
+	@rm $(PYTHON_MODULEDIR)/$(NAME).so
+
+' >> ./Makefile
+fi
 
 echo "Configure complete. Run 'make' to build."

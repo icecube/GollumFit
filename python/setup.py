@@ -1,9 +1,10 @@
-from setuptools import setup, Extension
+from setuptools import setup
+from pybind11.setup_helpers import Pybind11Extension
 import sys, os, os.path
 import numpy as np
 import glob
-import pybind11
 import subprocess
+import pybind11
 
 if sys.platform == 'win32' or sys.platform == 'win64':
     print('Windows is not a supported platform.')
@@ -36,7 +37,7 @@ else:
                  'LeptonWeighter', 'photospline',
                  'SQuIDS','nuSQuIDS',
                  'gsl','gslcblas','m','z',
-                 'hdf5','hdf5_hl','PhysTools','cfitsio']
+                 'hdf5','hdf5_hl','PhysTools','cfitsio','GollumFit']
 
     architecture = os.uname().machine
     library_dirs = [gollum_build_path+'/lib/python{}.{}/site-packages'.format(sys.version_info[0], sys.version_info[1]),
@@ -82,14 +83,15 @@ else:
 files = ['GollumFitPy.cpp']
 gollum_space_path = os.environ['GOLLUMSPACE']
 extra_objs = glob.glob(gollum_space_path+'/lib/*.o')
+print('extra_objs:', extra_objs)
 
 setup(name='GollumFitPy',
       ext_modules = [
-          Extension('GollumFitPy', files,
+          Pybind11Extension('GollumFitPy', files,
               library_dirs=library_dirs,
               libraries=libraries,
               include_dirs=include_dirs,
-              extra_objects=extra_objs,
+              #extra_objects=extra_objs,
               extra_compile_args=['-v', '-O3','-fPIC','-std=c++14', '-fpermissive'],
               language='c++',
               depends=[]),
