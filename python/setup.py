@@ -27,6 +27,7 @@ else:
     # add some paths for common locations of libraries and includes
     include_dirs = [gollum_build_path+'/include',
                     COOLCVMFSROOT+'/include',
+                    '/usr/local/include',
                     prefix+'/include',
                     np.get_include(),
                     '../include/',
@@ -45,6 +46,8 @@ else:
                     gollum_build_path+'/lib64',
                     COOLCVMFSROOT+'/lib',
                     COOLCVMFSROOT+'/lib64',
+                    '/usr/local/lib',
+                    '/usr/local/lib64',
                     prefix+'/lib',
                     prefix+'/lib64',
                     f"/usr/lib/{architecture}-linux-gnu/hdf5/serial"]
@@ -85,6 +88,12 @@ gollum_space_path = os.environ['GOLLUMSPACE']
 extra_objs = glob.glob(gollum_space_path+'/lib/*.o')
 print('extra_objs:', extra_objs)
 
+extra_link_args = []
+if sys.platform == "darwin":
+    extra_link_args += ["-Wl,-rpath,@loader_path"]
+    for d in library_dirs:
+        extra_link_args += [f"-Wl,-rpath,{d}"]
+
 setup(name='GollumFitPy',
       ext_modules = [
           Pybind11Extension('GollumFitPy', files,
@@ -93,6 +102,7 @@ setup(name='GollumFitPy',
               include_dirs=include_dirs,
               #extra_objects=extra_objs,
               extra_compile_args=['-v', '-O3','-fPIC','-std=c++14', '-fpermissive'],
+              extra_link_args=extra_link_args,
               language='c++',
               depends=[]),
           ]

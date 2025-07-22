@@ -725,6 +725,13 @@ if [ "$BOOST_PYTHON_FOUND" ]; then
 	echo "PYTHON_MODULEDIR=$PYTHON_MODULEDIR" >> ./Makefile
 fi
 
+if [ "$OS_NAME" = "Darwin" ]; then
+    echo "LDFLAGS+=-Wl,-rpath,@loader_path" >> ./Makefile
+    if [ -n "$BOOST_LIBDIR" ]; then
+        echo "LDFLAGS+=-Wl,-rpath,$BOOST_LIBDIR" >> ./Makefile
+    fi
+fi
+
 echo '
 
 INC_GF=$(PATH_GF)/include
