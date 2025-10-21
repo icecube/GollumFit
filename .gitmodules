@@ -6,7 +6,7 @@
 	url = https://github.com/arguelles/nuSQuIDS.git
 [submodule "vendor/LeptonWeighter"]
 	path = vendor/LeptonWeighter
-	url = https://github.com/alexwenym/LeptonWeighter.git
+	url = https://github.com/icecube/LeptonWeighter.git
 [submodule "vendor/PhysTools"]
 	path = vendor/PhysTools
 	url = https://github.com/icecube/PhysTools.git
