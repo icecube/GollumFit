@@ -12,6 +12,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <optional>
 #include <sys/stat.h>
 #include <boost/math/constants/constants.hpp>
 
@@ -557,6 +558,7 @@ struct SteeringParams {
   double logEbinWidth;///< bin width in log energy
   double cosThbinEdge;///< starting bin edge in cosine zenith
   double cosThbinWidth;///< bin width in cosine zenith
+  std::optional<double> astroOscAvgScale = std::nullopt;///< energy scale above which the astro component will be averaged out in the nuSQuIDSAtm class
 
   std::vector<std::string> ice_gradient_filename;
   std::vector<std::string> active_hadronic_parameters;
