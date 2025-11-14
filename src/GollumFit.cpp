@@ -473,6 +473,15 @@ void GollumFit::ConstructFluxWeighter(){
   fluxConv_ = std::make_shared<LW::nuSQUIDSAtmFlux<>>(CheckedFilePath(dataPaths_.conventional_nusquids_atmospheric_file), false);
   fluxPrompt_ = std::make_shared<LW::nuSQUIDSAtmFlux<>>(CheckedFilePath(dataPaths_.prompt_nusquids_atmospheric_file), false);
   fluxAstro_ = std::make_shared<LW::nuSQUIDSAtmFlux<>>(CheckedFilePath(dataPaths_.astro_nusquids_file));
+
+  // Enable averaged flavor evaluation for astro flux weighter
+  if (steeringParams_.astroOscAvgScale.has_value()) {
+    fluxAstro_->EnableAveragedEval(steeringParams_.astroOscAvgScale.value());
+    std::cout << "Astro flux weighter will use averaged oscillation evaluation above " << steeringParams_.astroOscAvgScale.value() << " eV." << std::endl;
+  } else {
+    std::cout << "Warning: Astro flux weighter will NOT use averaged oscillation evaluation." << std::endl;
+  }
+  
   flux_weighter_constructed_= true;
   simulation_initialized_ = false;
 }
