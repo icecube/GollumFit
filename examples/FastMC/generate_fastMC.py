@@ -77,7 +77,7 @@ gollumfit.ConstructFastMode(float(metascaling))
 #####################################################################################
 # Save it
 #####################################################################################
-gollumfit.WriteCompact(".")
+gollumfit.WriteCompact("example.fastmc")
 
 print("Done generating FastMC.")
 
