@@ -182,6 +182,7 @@ PYBIND11_MODULE(GollumFitPy, m)
     .def_readwrite("grad_tol",&GF::SteeringParams::grad_tol)
     .def_readwrite("energyName",&GF::SteeringParams::energyName)
     .def_readwrite("selectionStart",&GF::SteeringParams::selectionStart)
+    .def_readwrite("enableTotalNorm",&GF::SteeringParams::enableTotalNorm)
   ;
 
 
