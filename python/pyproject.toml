@@ -1,0 +1,25 @@
+[build-system]
+requires = [
+  "setuptools>=61",
+  "wheel",
+  "pybind11>=2.10",
+  "numpy",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "GollumFitPy"
+version = "0.0.0"
+description = "Python bindings for GollumFit (pybind11 extension)"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = ["numpy"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: C++",
+  "Operating System :: POSIX :: Linux",
+  "Operating System :: MacOS :: MacOS X",
+]
+
+[tool.setuptools]
+packages = []
