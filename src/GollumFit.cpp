@@ -249,16 +249,12 @@ void GollumFit::LoadMC(){
  * **********************************************************************************************************/
 
 bool GollumFit::WriteCompact(string file_path) const {
-  // ALEJO: be aware that the sideband MC and data are not dump on the compact format.
-  std::string file_path_compact = file_path + "/STERILE.meows";
-  gollumfit::dump::splatData(file_path_compact,0,sample_,(fastmode_constructed_)?metaEvents_:mainSimulation_);
+  gollumfit::dump::splatData(file_path,0,sample_,(fastmode_constructed_)?metaEvents_:mainSimulation_);
   return true;
 }
 
 void GollumFit::LoadCompact() {
-  // ALEJO: be aware that the sideband MC and data are not dump on the compact format.
-  std::string file_path_compact = dataPaths_.compact_file_path + "/STERILE.meows";
-  gollumfit::dump::unsplatData(CheckedFilePath(file_path_compact),0,sample_,mainSimulation_);
+  gollumfit::dump::unsplatData(CheckedFilePath(dataPaths_.compact_file_path),0,sample_,mainSimulation_);
   data_loaded_ = true;
   simulation_loaded_ = true;
 }
@@ -549,8 +545,8 @@ void GollumFit::ConstructSimulationHistogram(){
   typedef std::remove_reference<decltype(std::get<0>(simHist_))>::type Hist0;
 
   Hist0 h0(LogarithmicAxis(steeringParams_.logEbinEdge, steeringParams_.logEbinWidth), // energy dimension
-                       LinearAxis(steeringParams_.cosThbinEdge, steeringParams_.cosThbinWidth), // zenith dimension
-                       LinearAxis(0,1)); // topology dimension
+           LinearAxis(steeringParams_.cosThbinEdge, steeringParams_.cosThbinWidth),    // zenith dimension
+           LinearAxis(0,1));                                                           // topology dimension
 
   simHist_ = std::make_tuple(h0);
 
