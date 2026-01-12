@@ -577,6 +577,8 @@ struct SteeringParams {
   string energyName;
   double selectionStart;
 
+  bool enableTotalNorm = true;///< If true, convNorm is applied to all flux components
+
   /**
   * @brief Default constructor.
   */

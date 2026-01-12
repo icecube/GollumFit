@@ -1198,8 +1198,8 @@ struct WeighterMaker{
                 auto prompt = promptNorm * promptHoleIce * promptDOMEff * promptAtt * promptFlux;
                 auto astro  = astroNorm  * astroHoleIce  * astroDOMEff  * astroAtt  * astroFlux * neuaneu_wgt * brokenpowerlawTiltWeighter<Event,DataType>(astroPivot, astroDeltaGamma, astroDeltaGammaSec);
                 
-                return convNorm*(conv+prompt+astro)*icegrad_wgt;
-
+                if (steering->enableTotalNorm) { return convNorm*(conv+prompt+astro)*icegrad_wgt; }
+                else { return (convNorm*conv+prompt+astro)*icegrad_wgt; }
             }
 };
 
