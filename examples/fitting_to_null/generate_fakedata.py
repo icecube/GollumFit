@@ -1,3 +1,13 @@
+"""
+Generate Null Pseudo-Data Example
+
+This script generates null pseudo-data (expectation with nominal nuisance parameters)
+for use in fitting examples.
+
+Example command:
+    nohup time python ./generate_fakedata.py > generate_fakedata.log 2>&1 &
+"""
+
 import GollumFitPy as gf
 import numpy as np
 import os
@@ -6,12 +16,9 @@ import h5py
 from collections import OrderedDict
 import scipy.stats as stats
 
-# example command:
-# nohup time python ./generate_fakedata.py > generate_fakedata.log 2>&1 &
-
 #####################################################################################
-# Dict to define all the systematics, the centers, and widths
-# [ bool whether to turn off, prior shape, center, width, lower limit, upper limit ]
+# Define Nuisance Parameters
+# Format: [vary_flag, prior_type, center, width, lower_bound, upper_bound]
 #####################################################################################
 syst_dict     = OrderedDict({ 
     'convNorm'                  : [ True, 'Gaussian',      1.,   0.2,                   0.1,                   3. ], 

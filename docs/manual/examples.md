@@ -1,19 +1,51 @@
-# Examples
+# Examples {#examples}
 
-To comprehensively demonstrate the capabilities of GollumFit, we provide a set of toy Monte Carlo, nuisance parameter splines & gradients, and a series of Python scripts to give a set of self-contained examples on the usage of `GollumFit`. In particular, we provide some examples on generating expectations, minimizing the LLH, and generating FastMC.
+## Overview
 
-Example Monte Carlo is required to run these examples. It is generated from some version of IceCube software and includes 5 files. These must be downloaded from [https://doi.org/10.7910/DVN/5DSDTD](https://doi.org/10.7910/DVN/5DSDTD), and extracted to `GollumFit/monte_carlo/STERILE`. 
+This section provides comprehensive, self-contained examples demonstrating GollumFit's capabilities through:
+- Toy Monte Carlo datasets
+- Nuisance parameter splines and gradients
+- Python scripts for common analysis tasks
 
-The splines and gradients required for the minimization of the likelihood with respect to the nuisance parameters are stored in `GollumFit/resources`, which also include the scripts to generate some of them. Finally, the actual example scripts and their outputs are contained in `GollumFit/examples`.
+### Required Resources
 
-The examples featured here are split into code blocks with accompanying explanation. 
-The full example scripts are contained in the `examples` directory.
+**Monte Carlo Data:**
 
-## FastMC generation
+Example Monte Carlo (5 files generated from IceCube software) must be downloaded and extracted:
+- **Download**: [https://doi.org/10.7910/DVN/5DSDTD](https://doi.org/10.7910/DVN/5DSDTD)
+- **Extract to**: `GollumFit/monte_carlo/STERILE`
 
-We show the procedure of generating FastMC, which is used to generate an iteration of the Monte Carlo. This is necessary for subsequent examples and is an important step in ensuring that the fitting is efficient.
+**Nuisance Parameter Resources:**
 
-We begin with necessary imports.
+Splines and gradients for likelihood minimization are stored in:
+- **Location**: [GollumFit/resources](../../resources)
+- **Contents**: Pre-generated splines and scripts to create custom ones
+
+**Example Scripts:**
+
+All example code and outputs are in:
+- **Location**: [GollumFit/examples](../../examples)
+
+### Example Structure
+
+Each example is presented as:
+1. Annotated code blocks with explanations
+2. Complete scripts available in the `examples` directory
+3. Expected outputs and visualizations
+
+---
+
+## FastMC Generation
+
+### Overview
+
+FastMC is a compressed representation of Monte Carlo that significantly improves fitting efficiency by reducing memory footprint while preserving analysis-relevant information. This example demonstrates the generation process.
+
+**Purpose**: Generate compressed Monte Carlo for use in subsequent examples
+
+### Implementation
+
+#### Import Required Modules
 
 ```python
 import GollumFitPy as gf
@@ -21,13 +53,15 @@ import numpy as np
 import os
 ```
 
-We then set the paths of the splines and cross sections by loading them into a `DataPaths` object.
+#### Configure Data Paths
+
+Set paths for cross section splines and other required data files:
 
 ```python
 datapaths = gf.DataPaths()
 datapaths.neutrino_cc_xs_spline_path             = "../../resources/Splines/CrossSections/sigma_nu_CC_iso.fits"
 datapaths.antineutrino_cc_xs_spline_path         = "../../resources/Splines/CrossSections/sigma_nubar_CC_iso.fits"
-...
+# ... (additional cross section paths)
 ```
 
 We then load the fluxes, including the locations of the hadronic and cosmic ray splines (necessary for flux nuisance parameters).
@@ -43,7 +77,9 @@ for hadron in hadronlist : datapaths.hadronic_spline_path   = os.path.dirname(".
 for cr in crlist         : datapaths.cosmic_ray_spline_path = os.path.dirname("../fluxes/"+cr+".hdf5")
 ```
 
-We then set the steering parameters - in particular, we set the binning for the histograms. This information is loaded into a `SteeringParams` object.
+#### Set Steering Parameters
+
+Configure analysis binning and other parameters. **Note**: Binning choices affect FastMC compression and must match the analysis configuration.
 
 ```python
 steering_params = gf.SteeringParams()
@@ -65,25 +101,40 @@ steering_params.simToLoad                       = "BDT_Split_HE"
 steering_params.energyName                      = "DnnEnergy"
 ```
 
-We declare a `GollumFit` object, construct the FastMC, and write it to file. The inputs are the `DataPaths` and `SteeringParams` objects that we declared and filled previously.
+#### Construct and Write FastMC
+
+Create the GollumFit object, generate FastMC with specified compression, and save to file:
 
 ```python
-gollumfit = gf.GollumFit(datapaths,steering_params)
+gollumfit = gf.GollumFit(datapaths, steering_params)
 
-# metascaling controls the FastMC compression. Large values can cause loss of accuracy
-metascaling = "0.25"
-gollumfit.ConstructFastMode(float(metascaling))
+# Compression parameter: smaller values = higher compression but potential accuracy loss
+metascaling = 0.25
+gollumfit.ConstructFastMode(metascaling)
 
+# Write to current directory
 gollumfit.WriteCompact(".")
 ```
 
-The output is a `STERILE.meows` file that contains the FastMC, which can be loaded in another instance by assigning its directory path to the `DataPaths.compact_file_path` variable.
+**Output**: A `STERILE.meows` file containing the compressed FastMC. To use this in subsequent analyses, set `DataPaths.compact_file_path` to the directory containing this file.
+
+---
 
 ## Generating Expectations
 
-In this example, we explain how to set up the GollumFit object and output an expectation histogram given certain nuisance parameters and a FastMC file. While performing a fit, `GollumFit` will internally evaluate this expectation many times; here, we show how to obtain it. In particular, we consider the expectation given the nominal set of nuisance parameters, and likewise for a set of nuisance parameters with a shifted value of the DOM efficiency nuisance parameter. It is a good way to explicitly see the effect of varying a particular nuisance parameter and is useful for various tests that one may want to do surrounding a complex physics analysis. Of course, in general, we may vary any nuisance parameter in any combination, in order to see the desired effect on the expectation.
+### Overview
 
-As usual, we begin with imports.
+This example demonstrates how to generate expectation histograms for different nuisance parameter values using a FastMC file. During fitting, GollumFit evaluates expectations repeatedly; here we show how to obtain them explicitly for analysis and validation.
+
+**Use Case**: Examine the effect of varying specific nuisance parameters on the expected event distribution.
+
+**Example**: We'll generate expectations for:
+1. Nominal nuisance parameter values
+2. Shifted DOM efficiency parameter
+
+### Implementation
+
+#### Import Required Modules
 
 ```python
 import GollumFitPy as gf
@@ -94,18 +145,29 @@ from collections import OrderedDict
 import scipy.stats as stats
 ```
 
-We then declare a dictionary containing all the nuisance parameters. In each entry, the name is indicated, followed by a list containing a boolean, string, and four floats. They indicate, respectively, whether the parameter is ignored in the fit (`False` to enable in fitting), the prior shape (`Gaussian` or `Uniform`), the center, the width, the lower bound, and the upper bound of the prior.
+#### Define Nuisance Parameters
+
+Create a dictionary containing all nuisance parameters. Each entry specifies:
+- **Name**: Parameter identifier
+- **[0]**: `False` to vary in fit, `True` to fix
+- **[1]**: Prior distribution type (`'Gaussian'` or `'Uniform'`)
+- **[2]**: Central value
+- **[3]**: Width (1-sigma for Gaussian)
+- **[4]**: Lower bound
+- **[5]**: Upper bound
 
 ```python
-syst_dict     = OrderedDict({ 
-    'convNorm' :          [ True, 'Gaussian', 1. 0.2, 0.1, 3. ], 
-    'zenithCorrection' :  [ True, 'Gaussian',  0., 1., -3.,  3. ], 
-    'kaonLosses' :        [ True, 'Gaussian', 0., 1., -3., 3. ], 
-...
+syst_dict = OrderedDict({ 
+    'convNorm':          [True, 'Gaussian', 1.0, 0.2, 0.1, 3.0], 
+    'zenithCorrection':  [True, 'Gaussian', 0.0, 1.0, -3.0, 3.0], 
+    'kaonLosses':        [True, 'Gaussian', 0.0, 1.0, -3.0, 3.0], 
+    # ... (additional parameters)
 })
 ```
 
-We then set the paths of the splines and FastMC to be used in a fitting by loading them into a `DataPaths` object.
+#### Configure Data Paths
+
+Set paths to required splines and the FastMC file:
 
 ```python
 datapaths = gf.DataPaths()
@@ -115,7 +177,9 @@ datapaths.attenuation_spline_path = "../../resources/Splines/AttenuationSplines/
 datapaths.compact_file_path       = "../FastMC"
 ```
 
-Next, we set the steering parameters which primarily determine the binning for the histograms. Also, we declare an instance of the main `GollumFit` object again with the `datapaths` and `steering_params` as the input.
+#### Set Steering Parameters and Initialize
+
+Configure binning parameters and create the GollumFit object:
 
 ```python
 steering_params = gf.SteeringParams()
@@ -130,18 +194,21 @@ steering_params.cosThbinWidth                   = 0.05
 steering_params.selectionStart                  = float("DnnEnergy_0.99".split("_")[1])
 steering_params.evalThreads                     = 1
 
-energybincount = (np.log10(steering_params.maxFitEnergy) - np.log10(steering_params.minFitEnergy))/steering_params.logEbinWidth
-costhbincount = (steering_params.maxCosth - steering_params.minCosth)/steering_params.cosThbinWidth
+# Calculate bin counts
+energybincount = int((np.log10(steering_params.maxFitEnergy) - np.log10(steering_params.minFitEnergy)) / steering_params.logEbinWidth)
+costhbincount = int((steering_params.maxCosth - steering_params.minCosth) / steering_params.cosThbinWidth)
 
-gollumfit = gf.GollumFit(datapaths,steering_params)
+gollumfit = gf.GollumFit(datapaths, steering_params)
 ```
 
-Now, we set up a `.h5` file with the correct structure to contain the expectation histogram, so that we may save to it later. We will also a list where we can save the corresponding values of the nuisance parameters.
+#### Prepare Output File
+
+Create an HDF5 file to store expectations and corresponding parameter values:
 
 ```python
 print("Entering bin weights generation loop.")
-outfilename = 'example_label'+'.h5'
-print('Results will be saved to '+outfilename+".")
+outfilename = 'example_label.h5'
+print(f'Results will be saved to {outfilename}.')
 
 with h5py.File(outfilename, 'a') as hf:
     if ('hists' in hf) and ('params' in hf):
@@ -158,56 +225,56 @@ with h5py.File(outfilename, 'a') as hf:
                                     maxshape=(None, len(syst_dict)), 
                                     dtype='float64')
         paramsdataset.attrs['syst_dict_keys'] = list(syst_dict.keys())
-    print("Successfully created or accessed datasets in output file.")    
+    print("Successfully created or accessed datasets in output file.")
 ```
 
-Continuing from the previous block, we set a random seed to have reproducible results. We then specify the two values of the `domEfficiency` that we want to evaluate the expectation at. We iterate over these values and for each, set the value of the `domEfficiency` parameter in the `fitparams` object. To evaluate the expectation, the `GetExpectation` method is called with the `fitparams` object as an input, so that the updated nuisance parameter value is being included. Finally, we save the nuisance parameter values that were used to a list.
+#### Generate Expectations
+
+Iterate over DOM efficiency values, generate expectations, and save results:
 
 ```python
     print("Entering loop to generate weights.")
-    np.random.seed(100)
+    np.random.seed(100)  # For reproducibility
     
-    # we vary the dom eff at two values, and generate the corresponding expectation at each
-    dofEff_list = [1.27, 1.27+0.02]
+    # Vary DOM efficiency at two values
+    domeff_list = [1.27, 1.27 + 0.02]  # Nominal and shifted
     
-    for de in dofEff_list: 
+    for de in domeff_list: 
+        # Initialize parameters to central values
         fitparams = gf.FitParameters()
-        # set the nuisance parameters to the central values stored in the dict we declared
         for sname in syst_dict.keys():
-            exec('fitparams.'+sname+' = syst_dict[\"'+sname+'\"][2]')
-        exec('fitparams.domEfficiency = de')
+            exec(f'fitparams.{sname} = syst_dict["{sname}"][2]')
         
+        # Set specific DOM efficiency value
+        fitparams.domEfficiency = de
+        
+        # Generate expectation for these parameters
         hist = gollumfit.GetExpectation(fitparams)
         
-        # recover the 38 nusiance param values too
-        nusianceparams = np.empty((len(syst_dict),), dtype=np.float64)
-        for i in range(len(list(syst_dict.keys()))):
-            exec('nusianceparams[i] = fitparams.'+list(syst_dict.keys())[i])
-```
-
-In the final part, we save the expectation output (a histogram) to the `.h5` file. For clarity, we also save the corresponding list of nuisance parameters that were input. Note that we have a separate histogram for starting and throughgoing events, so that we are working with two 2D arrays.
-
-```python
-        # Get the current shape of the dataset
+        # Store nuisance parameter values
+        nuisanceparams = np.empty((len(syst_dict),), dtype=np.float64)
+        for i, sname in enumerate(syst_dict.keys()):
+            exec(f'nuisanceparams[i] = fitparams.{sname}')
+        
+        # Save to HDF5 file
+        # Histograms are separated by event type: starting and throughgoing
         s_h = histdataset.shape
         s_p = paramsdataset.shape
-
-        # Calculate the new shape after appending
-        s_h_new = (s_h[0] + 1, s_h[1], s_h[2], s_h[3])
-        s_p_new = (s_p[0] + 1, s_p[1])
-    
-        # Resize the dataset to accommodate the new data
-        histdataset.resize(s_h_new)
-        paramsdataset.resize(s_p_new)
         
-        # Append the new data to the dataset
+        # Resize datasets
+        histdataset.resize((s_h[0] + 1, s_h[1], s_h[2], s_h[3]))
+        paramsdataset.resize((s_p[0] + 1, s_p[1]))
+        
+        # Append new data
         histdataset[s_h[0]:] = hist
-        paramsdataset[s_p[0]:] = nusianceparams
+        paramsdataset[s_p[0]:] = nuisanceparams
 ```
 
-The output of this example is plotted in figure \ref{fig:expectation_variation}, where we show the nominal expectation, and beside it the pull plot given the variation in `domEfficiency` that we have inserted here.
+**Output**: Expectation histograms (2D: energy × zenith, for starting and throughgoing events) with corresponding parameter values saved to `example_label.h5`.
 
-The code that follows is a script to plot the expectation that we have just generated and saved to the `.h5` file.
+### Visualization
+
+Plot the generated expectations:
 
 ```python
 import numpy as np
@@ -272,13 +339,24 @@ plt.tight_layout()
 plt.savefig('example_hist.pdf')
 ```
 
-## Fitting to null
+---
 
-In this example, we showcase the core functionality of `GollumFit`, in a fit of the Monte Carlo to data. In this case, our data is the null pseudo-data, which is simply the expectation generated with the nominal or central values of all nuisance parameters, which we are going to treat as the data to fit to. The example consists of two parts: generating the pseudo-data to fit to, and then performing the actual fit.
+## Fitting to Null Hypothesis
 
-### Generating Pseudo-Data
+### Overview
 
-To generate pseudo-data, we begin with the usual procedure of necessary imports and declaring the relevant nuisance parameters in a dictionary.
+This example demonstrates GollumFit's core functionality: fitting Monte Carlo to data using likelihood minimization. We use **null pseudo-data** (expectation with nominal nuisance parameters) as our test dataset.
+
+**Workflow**:
+1. Generate null pseudo-data (expectation at nominal parameters)
+2. Initialize fit with random parameter values
+3. Minimize likelihood to recover nominal parameters
+
+**Expected Result**: Successful fit should recover the nominal parameter values used to generate the pseudo-data.
+
+### Part 1: Generate Pseudo-Data
+
+#### Setup and Configuration
 
 ```python
 import GollumFitPy as gf
@@ -289,15 +367,18 @@ import h5py
 from collections import OrderedDict
 import scipy.stats as stats
 
+# Define nuisance parameters (as in previous example)
 syst_dict = OrderedDict({ 
-    'convNorm' :          [ True, 'Gaussian', 1.0, 0.2, 0.1, 3.0 ], 
-    'zenithCorrection' :  [ True, 'Gaussian', 0.0, 1.0, -3.0, 3.0 ], 
-    'kaonLosses' :        [ True, 'Gaussian', 0.0, 1.0, -3.0, 3.0 ], 
-    # ...
+    'convNorm':          [True, 'Gaussian', 1.0, 0.2, 0.1, 3.0], 
+    'zenithCorrection':  [True, 'Gaussian', 0.0, 1.0, -3.0, 3.0], 
+    'kaonLosses':        [True, 'Gaussian', 0.0, 1.0, -3.0, 3.0], 
+    # ... (additional parameters)
 })
 ```
 
-As before, we also set the paths to the relevant spline and FastMC files, and also set the steering parameters.
+#### Configure Paths and Parameters
+
+Set up data paths and steering parameters (similar to previous examples):
 
 ```python
 datapaths = gf.DataPaths()
@@ -319,38 +400,45 @@ steering_params.selectionStart                  = float("DnnEnergy_0.99".split("
 steering_params.evalThreads                     = 1
 ```
 
-We then declare the main `GollumFit` object in the standard way, and set the `fitparameters` object variables to those defined in the nuisance parameter dictionary `syst_dict`.
+#### Generate and Save Null Expectation
+
+Create GollumFit object, set parameters to nominal values, and generate pseudo-data:
 
 ```python
-gollumfit = gf.GollumFit(datapaths,steering_params)
+gollumfit = gf.GollumFit(datapaths, steering_params)
 
 fitparams = gf.FitParameters()
 
-# set the nuisance parameter values
+# Set all parameters to nominal (central) values
 for sname in syst_dict.keys():
     if sname: 
-        exec('fitparams.' + sname + ' = syst_dict["' + sname + '"][2]')
+        exec(f'fitparams.{sname} = syst_dict["{sname}"][2]')
 ```
 
-Finally, we use the method `GetExpectationEvents` to obtain a list of weighted events that correspond to the input nuisance parameters. We then save it to a numpy file `nullexpectation.npz`, which can be used later on.
+#### Export Pseudo-Data Events
+
+Generate weighted events corresponding to the nominal parameters and save:
 
 ```python
+# Get weighted event list for nominal parameters
 null_dist = gollumfit.GetExpectationEvents(fitparams)
 
-print('saving to npz file.')
+print('Saving to npz file.')
 realization = "nullexpectation.npz"
 np.savez(realization, realization=null_dist)
 
-print("Done. Data saved to " + realization)
+print(f"Done. Data saved to {realization}")
 ```
 
-We emphasize that this is a way to make pseudo-data with arbitrary values of nuisance parameters, which is a useful way to perform sensitivity studies or experiment with fitting; real data is fed in the same way, and can be swapped in at the unblinding stage.
+**Note**: This method generates pseudo-data with arbitrary parameter values, useful for sensitivity studies. For real analyses, substitute actual data at the unblinding stage using the same interface.
 
-### Fitting to the Pseudo-Data
+### Part 2: Fitting to Pseudo-Data
 
-Now we will use the pseudo-data output of the previous part to perform a fit. We will randomly initialize values of the nuisance parameters, and then fit to the pseudo-data that we created, treating it as real data. If the fit succeeds, we should recover the central (null) values of the nuisance parameters, which we used to generate the pseudo-data.
+#### Import and Setup
 
-To start, we perform the necessary imports and declare the nuisance parameters in a dictionary as usual. Note here that in the dictionary, we have `False` for all parameters as we are now varying them for the fit.
+Now we'll fit to the pseudo-data, starting from random initial parameter values. Success means recovering the nominal values.
+
+**Import modules and define parameters** (note: `False` means vary in fit):
 
 ```python
 import GollumFitPy as gf
@@ -368,49 +456,67 @@ syst_dict = OrderedDict({
 })
 ```
 
-We define a helper function that throws a random value of the nuisance parameter taking into account its range, center, and width.
+#### Define Random Sampling Function
+
+Create a helper function to sample random parameter values from their prior distributions:
 
 ```python
 def throw(syst):
+    """Sample random value from prior distribution."""
     if syst[1] == 'Gaussian': 
-        val = stats.truncnorm((syst[4] - syst[2]) / syst[3], (syst[5] - syst[2]) / syst[3], syst[2], syst[3]).rvs(1)
+        # Truncated normal distribution
+        val = stats.truncnorm(
+            (syst[4] - syst[2]) / syst[3],  # Lower bound (standardized)
+            (syst[5] - syst[2]) / syst[3],  # Upper bound (standardized)
+            syst[2],  # Mean
+            syst[3]   # Std dev
+        ).rvs(1)
         return val[0]
     else: 
+        # Uniform distribution
         return np.random.uniform(syst[4], syst[5])
 ```
 
-We declare various objects to characterize the nuisance parameters - their flag (whether they are fit over), bounds, prior value, and initialized value.
+#### Initialize Fit Parameter Objects
+
+Create objects to manage fit configuration:
 
 ```python
-fitparams_flag  = gf.FitParametersFlag()
-fitparams_bound = gf.FitParametersBound()
-priors          = gf.Priors()
-seed_fitparams  = gf.FitParameters()
+fitparams_flag  = gf.FitParametersFlag()  # Which parameters to vary
+fitparams_bound = gf.FitParametersBound()  # Parameter bounds
+priors          = gf.Priors()              # Prior distributions
+seed_fitparams  = gf.FitParameters()       # Initial values
 ```
 
-Now we declare a random seed for reproducibility, and iterate over the nuisance parameters. For each parameter, we set the prior centers and widths and ranges. We then use the `throw` function we defined earlier to set each nuisance parameter to a random initial value according to their prior distributions. The fit will commence from this value.
+#### Set Priors and Random Initial Values
+
+Configure priors and randomly initialize starting parameter values:
 
 ```python
-np.random.seed(100)
+np.random.seed(100)  # For reproducibility
 print('Initializing with the following randomly-seeded nuisance params:')
 
 for sname in syst_dict.keys():
-    exec('fitparams_flag.' + sname + ' = syst_dict["' + sname + '"][0]')
-    exec('fitparams_bound.' + sname + 'Min = syst_dict["' + sname + '"][4]')
-    exec('fitparams_bound.' + sname + 'Max = syst_dict["' + sname + '"][5]')
+    # Set flags and bounds
+    exec(f'fitparams_flag.{sname} = syst_dict["{sname}"][0]')
+    exec(f'fitparams_bound.{sname}Min = syst_dict["{sname}"][4]')
+    exec(f'fitparams_bound.{sname}Max = syst_dict["{sname}"][5]')
+    
+    # Set priors
     if syst_dict[sname][1] == 'Gaussian':
-        exec('priors.' + sname + 'Center = syst_dict["' + sname + '"][2]')
-        exec('priors.' + sname + 'Width  = syst_dict["' + sname + '"][3]')
+        exec(f'priors.{sname}Center = syst_dict["{sname}"][2]')
+        exec(f'priors.{sname}Width  = syst_dict["{sname}"][3]')
     else:
-        exec('priors.' + sname + 'Min = syst_dict["' + sname + '"][4]')
-        exec('priors.' + sname + 'Max = syst_dict["' + sname + '"][5]')
-        
+        exec(f'priors.{sname}Min = syst_dict["{sname}"][4]')
+        exec(f'priors.{sname}Max = syst_dict["{sname}"][5]')
+    
+    # Randomly initialize
     thrown_val = throw(syst_dict[sname])
-    exec('seed_fitparams.' + sname + ' = thrown_val')
-    print(sname + ' ' + str(thrown_val))
+    exec(f'seed_fitparams.{sname} = thrown_val')
+    print(f'{sname}: {thrown_val}')
 ```
 
-Here, we set the correlations between the ice gradient and flux parameters. We also set the paths to the necessary spline and FastMC files, as in the previous examples.
+#### Set Correlations and Paths
 
 ```python
 gollumdir = "../../gollumfit-release"
@@ -428,27 +534,32 @@ datapaths.attenuation_spline_path = "../../resources/Splines/AttenuationSplines/
 datapaths.compact_file_path       = "../FastMC"
 ```
 
-We also set the steering parameters, as in previous examples. In particular, the binning must match the binning used to generate the FastMC.
+#### Configure Steering Parameters
+
+Set binning and convergence criteria (must match FastMC binning):
 
 ```python
 edges = np.logspace(np.log10(300), np.log10(1e5), 25)
+
 steering_params = gf.SteeringParams()
 steering_params.minFitEnergy   = edges[0]
 steering_params.maxFitEnergy   = edges[-1]
 steering_params.logEbinEdge    = np.log10(edges[0])
-steering_params.logEbinWidth   = np.log10(edges[1])-np.log10(edges[0])
-steering_params.minCosth       = -1
+steering_params.logEbinWidth   = np.log10(edges[1]) - np.log10(edges[0])
+steering_params.minCosth       = -1.0
 steering_params.maxCosth       = 0.0
 steering_params.cosThbinEdge   = 0.0
 steering_params.cosThbinWidth  = 0.05
 steering_params.selectionStart = float("DnnEnergy_0.99".split("_")[1])
 steering_params.evalThreads    = 1
+
+# Convergence criteria (tight tolerances for accurate minimization)
 steering_params.change_tol     = 1.e-20
 steering_params.grad_tol       = 1.e-20
 steering_params.uncertaintyModSigmaOverMu = 0.0
 ```
 
-We construct a `GollumFit` object and use the method `SetData` to read in the pseudo-data that we generated previously. In a real analysis, we would simply feed in the real data instead.
+#### Load Data and Configure Fit
 
 ```python
 gollumfit = gf.GollumFit(datapaths, steering_params)
@@ -466,7 +577,9 @@ gollumfit.SetFitParametersSeed([seed_fitparams])
 gollumfit.ConstructLikelihoodProblem()
 ```
 
-Finally, we invoke the `MinLLH` method to perform the minimization. This may typically take several hours. Afterwards, we print the best-fit nuisance parameters, as well as the minimum likelihood value and the number of likelihood evaluations that were required.
+#### Perform Likelihood Minimization
+
+Run the LBFGSB minimization algorithm:
 
 ```python
 print("Starting minimization...")
@@ -489,9 +602,11 @@ In the figure, we show a pull plot of the results. We plot the randomly-initiali
 
 The parameter `astroPivot`, in our fit, has no influence on the shape of the flux and therefore no effect on the likelihood. Hence there is no preferred value to be recovered.
 
+---
+
 ## Adding a new systematic parameter
 
-In many analyses, we may want to introduce new physics or nuisance parameters, or even extend to other experiments that may be characterized differently. Hence, there is often a need to include additional parameters to fit over. Unfortunately, this requires modifications to the source code. Here, we outline the necessary changes in the code for adding a new systematic parameter to fit over.
+In many analyses, we may want to introduce new physics or nuisance parameters, or even extend to other experiments that may be characterized differently. Hence, there is often a need to include additional parameters to fit over. In the current edition of GollumFit, this requires modifications to the source code. Here, we outline the necessary changes in the code for adding a new systematic parameter to fit over.
 
 1. In the files `GollumParameters.*`, append the new parameter and its priors (width, flag, center, etc.) to the appropriate objects.
 
@@ -504,6 +619,8 @@ In many analyses, we may want to introduce new physics or nuisance parameters, o
 5. In the files `GollumFit.*`, the function `GollumFit::ConstructLikelihoodProblem` should have the priors of the new parameter added to the existing lists of priors. Furthermore, the functions `GollumFit::MinLLH()`, as well as the helpers `GollumFit::ConvertFitParametersFlag()`, `GollumFit::ConvertFitParameters()`, and so on, should all have the new parameter appended in a straightforward way.
 
 6. There are some locations in the code, for example in the file `GollumFit.cpp` in the function `GollumFit::EvalLLHGradient`, and some `assert` checks in the same file, where the number of nuisance parameters (38 by default) is hard-coded. This must be adjusted to account for any new nuisance parameters.
+
+---
 
 ## Adding a new fitting dimension
 

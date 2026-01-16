@@ -1,63 +1,65 @@
-# Code Structure
+# Code Structure {#codestructure}
 
 ## Overview
 
-The GollumFit program is organized in a straightforward way. There is a central `GollumFit` class which handles the main functionality of the code, 
-accepting different necessary inputs depending on the desired functionality. 
+The GollumFit program is organized in a straightforward, modular architecture:
 
-There are a handful of helper structures like `FitParameters`, `FitResult` or `SteeringParams` which organize the various variables
-that are passed around. 
+### Core Components
 
-Re-weighting of events is handled by the `WeighterMaker` class, which constructs the various individual weighters
-that returns a weight for each event. 
+1. `GollumFit` Class: The central class that handles the main functionality of the code, accepting different inputs depending on the desired functionality.
 
-## Nuisance parameters
+2. Helper Structures: A collection of structures that organize variables passed throughout the program:
+   - `FitParameters`: Contains nuisance parameter values
+   - `FitResult`: Stores minimization results
+   - `SteeringParams`: Defines analysis configuration (binning, energy ranges, etc.)
+   - `DataPaths`: Specifies locations of input files and resources
 
-By default, GollumFit includes handling of common nuisance parameters to all neutrino telescopes, as well as IceCube-specific neutrino telescopes. The following table lists the nuisance parameters that are included.
+3. `WeighterMaker` Class: Handles event re-weighting by constructing individual weighters that calculate weight adjustments for each event based on nuisance parameter values.
 
-For more details, refer to the GollumFit publication.
+### Architecture Diagram
 
-Common to all neutrino telescopes
-- `convNorm`
-- `zenithCorrection`
-- `kaonLosses`
-- `hadronicHEkp`
-- `hadronicHEkm`
-- `hadronicVHE1pip`
-- `hadronicVHE1pim`
-- `hadronicVHE3kp`
-- `hadronicVHE3km`
-- `hadronicVHE3pip`
-- `hadronicVHE3pim`
-- `hadronicVHE3p`
-- `hadronicVHE3n`
-- `cosmicRay1`
-- `cosmicRay2`
-- `cosmicRay3`
-- `cosmicRay4`
-- `cosmicRay5`
-- `cosmicRay6`
-- `astroNorm`
-- `astroDeltaGamma`
-- `astroDeltaGammaSec`
-- `astroPivot`
-- `promptNorm`
-- `NeutrinoAntineutrinoRatio`
-- `nuxs`
-- `nubarxs`
+![GollumFit Architecture](codestructure_diagram.png)
+*Figure: High-level architecture showing the relationship between main components. (Replace with your figure)* 
 
-IceCube-specific Monte Carlo parameters
-- `domEfficiency`
-- `holeiceForward`
-- `icegrad0`
-- `icegrad1`
-- `icegrad2`
-- `icegrad3`
-- `icegrad4`
-- `icegrad5`
-- `icegrad6`
-- `icegrad7`
-- `icegrad8`
+## Nuisance Parameters
+
+GollumFit includes handling of common nuisance parameters for all neutrino telescopes, as well as IceCube-specific parameters. For detailed physics descriptions and prior values, refer to the GollumFit publication.
+
+### Common Neutrino Telescope Parameters
+**Flux Parameters:**
+- `convNorm` - Conventional atmospheric flux normalization
+- `promptNorm` - Prompt atmospheric flux normalization
+- `astroNorm` - Astrophysical flux normalization
+- `astroDeltaGamma` - Astrophysical spectral index variation (first break)
+- `astroDeltaGammaSec` - Astrophysical spectral index variation (second break)
+- `astroPivot` - Astrophysical spectrum break energy
+
+**Atmospheric Flux Systematics:**
+- `zenithCorrection` - Atmospheric density correction
+- `kaonLosses` - Kaon interaction losses
+- `cosmicRay1` through `cosmicRay6` - Global Spline Fit (GSF) cosmic ray parameters
+
+**Hadronic Interaction Parameters:**
+- `hadronicHEkp`, `hadronicHEkm` - High-energy kaon production ($K^+$, $K^-$ at 158 GeV)
+- `hadronicVHE1pip`, `hadronicVHE1pim` - Very-high-energy pion production ($\pi^+$, $\pi^-$ at 20 TeV)
+- `hadronicVHE3kp`, `hadronicVHE3km` - Very-high-energy kaon production ($K^+$, $K^-$ at 2 PeV)
+- `hadronicVHE3pip`, `hadronicVHE3pim` - Very-high-energy pion production ($\pi^+$, $\pi^-$ at 2 PeV)
+- `hadronicVHE3p`, `hadronicVHE3n` - Very-high-energy nucleon production (p, n at 2 PeV)
+
+**Cross Section and Interaction:**
+- `NeutrinoAntineutrinoRatio` - Ratio of neutrino to antineutrino flux
+- `nuxs` - Neutrino cross section attenuation
+- `nubarxs` - Antineutrino cross section attenuation
+
+### IceCube-Specific Detector Parameters
+
+**Detector Efficiency:**
+- `domEfficiency` - Digital Optical Module efficiency
+- `holeiceForward` - Hole ice forward scattering
+
+**Ice Model Parameters:**
+- `icegrad0` through `icegrad4` - Ice absorption gradients
+- `icegrad5` through `icegrad8` - Ice phase (scattering) gradients
 
 <!-- | Parameter                                                                                         | `GollumFit` Variable        | Prior Value ± Width       | Weighting Method    |
 |:--------------------------------------------------------------------------------------------------|:----------------------------|:--------------------------|:--------------------|

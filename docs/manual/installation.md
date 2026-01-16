@@ -1,36 +1,51 @@
-# Installation
+# Installation {#installation}
 
-## From Source
+## Building from Source
 
-### Software prerequisites
+### Prerequisites
 
-The following necessary prerequisites are included as subdirectories in GollumFit already:
-* SQuIDS (https://github.com/jsalvado/SQuIDS)
-* nuSQuIDS (https://github.com/arguelles/nuSQuIDS)
-* PhysTools (https://github.com/icecube/PhysTools)
-* LeptonWeighter (https://github.com/alexwenym/LeptonWeighter.git)
+#### Included Dependencies
 
-The following tools and libraries must be available on your system. Where relevant, the version that was most recently checked to work is indicated:
-* `g++` (9.2.0)
-* `make` (4.2.1)
-* `GSL`
-* `boost` (1.71.0)
-* `hdf5` 
-* `pthread`
-* `photospline` (https://github.com/cnweaver/photospline)
-* `cfitsio` (https://heasarc.gsfc.nasa.gov/fitsio/)
-* `pybind11` (for Python bindings; highly recommended)
+The following dependencies are included as git submodules in the GollumFit repository:
+- [SQuIDS](https://github.com/jsalvado/SQuIDS) - Solve Quantum Systems
+- [nuSQuIDS](https://github.com/arguelles/nuSQuIDS) - Neutrino oscillation solver
+- [PhysTools](https://github.com/icecube/PhysTools) - Physics utilities including LBFGSB
+- [LeptonWeighter](https://github.com/alexwenym/LeptonWeighter.git) - Lepton weighting utilities
 
-To access these tools and libraries, IceCube users should use the `cvmfs`:
-```
+#### Required System Dependencies
+
+The following tools and libraries must be installed on your system (tested versions in parentheses):
+
+**Compilers and Build Tools:**
+- `g++` (9.2.0 or later)
+- `make` (4.2.1 or later)
+
+**Scientific Libraries:**
+- <a href="https://www.gnu.org/software/gsl/"><code>GSL</code></a> - GNU Scientific Library
+- `boost` (1.71.0 or later)
+- `hdf5` - Hierarchical Data Format 5
+- `pthread` - POSIX threads
+- <a href="https://github.com/cnweaver/photospline"><code>photospline</code></a> - Photo-spline fitting
+- <a href="https://heasarc.gsfc.nasa.gov/fitsio/"><code>cfitsio</code></a> - FITS file I/O
+- `pybind11` - Python bindings (highly recommended)
+
+**For IceCube Users:**
+
+Access all required dependencies via CVMFS:
+```bash
 eval `/cvmfs/icecube.opensciencegrid.org/py3-v4.1.1/setup.sh`
 ```
-Otherwise, they must be installed and available.
 
-### Main Installation Procedure
+**For Other Users:**
 
-First, set up the environment and create the necessary directories: 
-```
+All dependencies must be installed manually and available in your system paths.
+
+### Installation Steps
+
+#### 1. Environment Setup
+
+First, set up the environment variables and create the necessary directories: 
+```bash
 export CXX=g++
 export CC=gcc
 export GOLLUMSPACE=/choose/your/favourite/dir
@@ -48,38 +63,54 @@ export HDF5_DISABLE_VERSION_CHECK=1
 mkdir $GOLLUMBUILDPATH
 mkdir $PREFIX/bin $PREFIX/include $PREFIX/lib $PREFIX/lib64
 ```
-For the Boost dependency, ensure that library and header directories are at the location `$BOOST_DIR`.
+**Note:** Ensure the Boost library and header directories are correctly set in `$BOOST_DIR`.
 
-Now check out the necessary code, including necessary submodules:
-```
+#### 2. Clone Repository
+
+Check out the GollumFit repository and initialize submodules:
+
+```bash
 cd $GOLLUMSOURCEPATH
 git clone https://github.com/icecube/GollumFit
 cd GollumFit
 git submodule update --init --recursive
 ```
 
-Compile the required software, one-by-one:  
-```
+#### 3. Build Dependencies
+
+Compile each dependency in order:
+
+**SQuIDS:**
+```bash
 # SQuIDS
 cd $GOLLUMSOURCEPATH/GollumFit/vendor/SQuIDS
 ./configure --prefix=$PREFIX
 make
 make install
+```
 
+**nuSQuIDS:**
+```bash
 # nuSQuIDS
 cd $GOLLUMSOURCEPATH/GollumFit/vendor/nuSQuIDS
 ./configure --prefix=$PREFIX --with-squids=$PREFIX --with-python-bindings --with-boost=$BOOST_DIR
 make
 make python
 make install
+```
 
+**PhysTools:**
+```bash
 # PhysTools
 cd $GOLLUMSOURCEPATH/GollumFit/vendor/PhysTools
 mkdir build build/lbfgsb
 ./configure --with-boost=$BOOST_DIR --prefix=$PREFIX
 make
 make install
+```
 
+**LeptonWeighter:**
+```bash
 # LeptonWeighter
 cd $GOLLUMSOURCEPATH/GollumFit/vendor/LeptonWeighter
 ./configure --prefix=$PREFIX --with-boost=$BOOST_DIR
@@ -87,65 +118,161 @@ make
 make install
 ```
 
-Now, compile GollumFit itself:
-```
+#### 4. Build GollumFit
+
+Compile the main GollumFit library:
+
+```bash
 cd $GOLLUMSOURCEPATH/GollumFit
 ./configure --prefix=$PREFIX --with-boost=$BOOST_DIR
 make
 make install
 ```
 
-Finally, compile the pybindings so that we can call functions and handle I/O in 
-a python script. This is the most convienient way to access GollumFit functionalities: 
+#### 5. Build Python Bindings
 
-```
+Compile the Python bindings (recommended for convenient access to GollumFit functionalities):
+
+```bash
 cd $GOLLUMSOURCEPATH/GollumFit/python
 python setup.py install --prefix=$PREFIX
 ```
 
-### Helper Tools
+#### 6. Optional Helper Tools
 
-After building these, you may optionally build the various functions in the `$GOLLUMSOURCEPATH/GollumFit/resources` folder. 
-For example, `FluxOscCalculator` can be built as follows:
+After the main build, you may optionally compile various utility tools in the resources folder. For example, to build the flux oscillation calculator:
 
-```
+```bash
 cd $GOLLUMSOURCEPATH/GollumFit/resources/FluxOscCalculator
 make
 ```
 
+Other available tools include:
+- `AttenuationSplineMaker` - Generate attenuation splines
+- `DDMFluxMaker` - Create DaemonFlux fluxes and covariance matrices
+- `FluxOscCalculator` - Calculate oscillated astrophysical neutrino fluxes
+
 ### Troubleshooting
 
-## Containers
+(This section is reserved for common installation issues and their solutions.)
 
-In addition to building from source, you may also choose to use a container.
+## Using Containers
 
-The repository includes a `Dockerfile` that can be used to create both a Docker and a Singularity container. The Docker container can be used in environments where one has Admin priviliges (like your local machine), while the Singularity container should be used on, for example, HPC clusters.
+As an alternative to building from source, GollumFit can be run in a containerized environment.
 
-The following section explains how to build a Docker image on your local machine and upload it to your personal `Docker Hub` account (which you can simply link to your Github account). The Singularity container can then be simply built on the cluster by pulling the Docker image from `Docker Hub`. Both the Docker container and the Singularity container can be used to start a Jupyter server inside the container, to which you then can connect to use GollumFit in Jupyter notebooks.
+### Overview
 
-### Building the Docker container and uploading it to Docker Hub
-1. Install [Docker](https://docs.docker.com/engine/install/) (I also recommend the desktop app, but its not needed).
-2. Create a Docker Hub account [here](https://app.docker.com/signup) if you do not have one. You can use your Github or Google account. Make sure you have enough private repo slots available (the free plan offers only 1 private repo).
-3. Go to your [Docker Hub repositories](https://hub.docker.com/repositories/) and create a repo.
-4. Clone the [GollumFit repo](https://github.com/icecube/GollumFit.git) to your local machine and `cd` into it.
-5. Create a builder with `docker buildx create --name gollumfit-builder --use`
-6. We want to build the container for `amd64` architectures (most clusters and non-Mac PCs) and push it to your Docker Hub. Optionally, as described further below, the container can additionally be built for `arm64` (most Mac PCs) architectures. The `amd64` build can be achieved with
+The repository includes a [Dockerfile](../../docker/Dockerfile) that can be used to create both Docker and Singularity containers:
+- **Docker**: For local machines where you have admin privileges
+- **Singularity/Apptainer**: For HPC clusters and shared computing environments
 
-    ```docker buildx build --platform linux/amd64 -f docker/Dockerfile -t <your_dockerhub_username>/<repo_name>:<tag> --push .```
+The workflow involves:
+1. Building a Docker image on your local machine
+2. Uploading to Docker Hub
+3. Pulling to create a Singularity container on the cluster
+4. Running Jupyter notebooks inside the container
 
-    You can choose, for example, `gollumfit` as repo name and `latest` as tag. After executing the command, the images for both architectures can be seen in your [Docker Hub repository](https://hub.docker.com/repositories/). If you also want to run this container on your Mac (i.e. arm64 architecture), execute aboves command with `--platform linux/amd64,linux/arm64`. Note that we have experienced that the latter takes very long if the container is built on a non-Mac PC.
+### Docker Container Setup
 
-### Building the Singularity container
-The Singularity container can be built from the Docker image that you uploaded to your Docker Hub in the previous step.
+#### Building and Uploading to Docker Hub
+1. **Install Docker**: Download and install [Docker](https://docs.docker.com/engine/install/) (Docker Desktop recommended but not required).
 
-1. Check that Singularity is installed on your cluster via `singularity --version` or `apptainer --version` (singularity and apptainer are basically synonyms)
-2. Add a read-only personal access token (PAT) to your Docker Hub account [here](https://app.docker.com/settings/personal-access-tokens).
-3. Pull the Docker image and convert it to a singularity image file with `singularity pull --docker-login docker://<your_dockerhub_username>/<repo_name>:<tag>`
+2. **Create Docker Hub Account**: Sign up at [Docker Hub](https://app.docker.com/signup) using your GitHub or Google account. Ensure you have available repository slots (free plan includes 1 private repo).
 
-    You will be asked for your Docker Hub username and a password, for which you can take the PAT that you created in step 2. There might be warnings about the usage of undefined variables, which can be ignored.
+3. **Create Repository**: Navigate to your [Docker Hub repositories](https://hub.docker.com/repositories/) and create a new repository.
 
-### Starting a Jupyter server and connecting to it
-1. The containers include a command `start-jupyter-server`, which executes the script that you can find in `docker/start-jupyter-server-in-container.sh`. Start the server with `singularity exec <sif_file> start-jupyter-server`
-2. The output should include lines similar to `http://127.0.0.1:<port>/tree?token=<token>`.
-3. If you use VS code, open a Jupyter notebook and click on `Select Kernel`. Then choose `Existing Jupyter Server` and copy/paste the URL from step 2.
-4.  If you do not use VS code, you have to do port forwarding from your local machine to the cluster. This can be done by executing `ssh -L <port>:localhost:<port> <username>@<remote_host>` on your local machine, where `<port>` is the port found in the URL in step 2, and `<username>`/`<remote host>` are the username and the hostname in your ssh config (the one you use to connect to the cluster). Then you can open a browser and copy/paste the URL in step 2 into the address line.
+4. **Clone GollumFit**: Clone the repository to your local machine:
+   ```bash
+   git clone https://github.com/icecube/GollumFit.git
+   cd GollumFit
+   ```
+
+5. **Create Builder**: Set up a multi-platform builder:
+   ```bash
+   docker buildx create --name gollumfit-builder --use
+   ```
+
+6. **Build and Push**: Build for `amd64` architecture (most clusters and non-Mac PCs):
+   ```bash
+   docker buildx build --platform linux/amd64 \
+     -f docker/Dockerfile \
+     -t <your_dockerhub_username>/<repo_name>:<tag> \
+     --push .
+   ```
+   
+   Example: `gollumfit` as repo name and `latest` as tag.
+   
+   **For Mac users**: To also support `arm64` architecture:
+   ```bash
+   docker buildx build --platform linux/amd64,linux/arm64 \
+     -f docker/Dockerfile \
+     -t <your_dockerhub_username>/<repo_name>:<tag> \
+     --push .
+   ```
+   
+   **Note**: Building for multiple platforms may take significantly longer on non-Mac systems.
+
+### Singularity Container Setup
+
+Build a Singularity/Apptainer container from your Docker image for use on HPC clusters.
+
+1. **Verify Singularity Installation**: Check that Singularity or Apptainer is available:
+   ```bash
+   singularity --version
+   # or
+   apptainer --version
+   ```
+   
+   **Note**: Singularity and Apptainer are equivalent.
+
+2. **Create Access Token**: Generate a read-only Personal Access Token (PAT) at [Docker Hub Settings](https://app.docker.com/settings/personal-access-tokens).
+
+3. **Pull and Convert Image**:
+   ```bash
+   singularity pull --docker-login docker://<your_dockerhub_username>/<repo_name>:<tag>
+   ```
+   
+   When prompted:
+   - Username: Your Docker Hub username
+   - Password: The PAT from step 2
+   
+   **Note**: You may see warnings about undefined variables; these can be safely ignored.
+
+### Running Jupyter in the Container
+
+#### Start Jupyter Server
+
+The containers include a convenience command to launch Jupyter:
+
+```bash
+singularity exec <sif_file> start-jupyter-server
+```
+
+This executes the script [docker/start-jupyter-server-in-container.sh](../../docker/start-jupyter-server-in-container.sh).
+
+The output will include a URL similar to:
+```
+http://127.0.0.1:<port>/tree?token=<token>
+```
+
+#### Connect to Jupyter
+
+**Option 1: VS Code (Recommended)**
+
+1. Open a Jupyter notebook in VS Code
+2. Click `Select Kernel`
+3. Choose `Existing Jupyter Server`
+4. Paste the URL from the server output
+
+**Option 2: Browser with SSH Port Forwarding**
+
+1. On your local machine, set up port forwarding:
+   ```bash
+   ssh -L <port>:localhost:<port> <username>@<remote_host>
+   ```
+   
+   Where:
+   - `<port>` is from the Jupyter URL
+   - `<username>@<remote_host>` matches your SSH config
+
+2. Open a browser and navigate to the URL from the server output

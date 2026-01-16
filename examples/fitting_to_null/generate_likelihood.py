@@ -1,5 +1,16 @@
 #!/usr/bin/env python3
 
+"""
+Likelihood Minimization Example - Fitting to Null Hypothesis
+
+This script demonstrates GollumFit's core functionality: fitting Monte Carlo to
+data using likelihood minimization. We fit to null pseudo-data starting from
+random initial parameter values.
+
+Example command:
+    nohup time python ./generate_likelihood.py > generate_likelihood.log 2>&1 &
+"""
+
 import GollumFitPy as gf
 import numpy as np
 import os
@@ -7,14 +18,11 @@ import sys
 import subprocess
 import scipy.stats as stats
 
-# example command:
-# nohup time python ./generate_likelihood.py > generate_likelihood.log 2>&1 &
-
-print('Starting geneate_likelihood.py.')
+print('Starting generate_likelihood.py.')
 
 #####################################################################################
-# Dict to define all the systematics, the centers, and widths
-# [ bool whether to turn off, prior shape, center, width, lower limit, upper limit ]
+# Define Nuisance Parameters (All set to vary in fit with False flag)
+# Format: [vary_flag, prior_type, center, width, lower_bound, upper_bound]
 #####################################################################################
 syst_dict     = { 
     'convNorm'                  : [ False, 'Gaussian',      1.,   0.2,                   0.1,                   3. ], 
@@ -58,60 +66,73 @@ syst_dict     = {
 }
 
 #####################################################################################
-# helper function to throw random values of nuisance parameters according to their
-# prior centers and widths
+# Define Random Sampling Function
+# Helper function to sample random parameter values from prior distributions
 #####################################################################################
-def throw(syst) :
-    if syst[1]=='Gaussian' : 
-        val = stats.truncnorm((syst[4]-syst[2])/syst[3], (syst[5]-syst[2])/syst[3], syst[2], syst[3]).rvs(1)
+def throw(syst):
+    """Sample random value from prior distribution."""
+    if syst[1] == 'Gaussian':
+        # Truncated normal distribution
+        val = stats.truncnorm(
+            (syst[4] - syst[2]) / syst[3],  # Lower bound (standardized)
+            (syst[5] - syst[2]) / syst[3],  # Upper bound (standardized)
+            syst[2],  # Mean
+            syst[3]   # Std dev
+        ).rvs(1)
         return val[0]
-    else : 
-        return np.random.uniform(syst[4],syst[5])
+    else:
+        # Uniform distribution
+        return np.random.uniform(syst[4], syst[5])
 
 #####################################################################################
-# feed the flags, bounds, priors, on the nuisance parameters
+# Initialize Fit Parameter Objects
+# Create objects to manage fit configuration
 #####################################################################################
 
-fitparams_flag  = gf.FitParametersFlag()
-fitparams_bound = gf.FitParametersBound()
-priors          = gf.Priors()
-seed_fitparams  = gf.FitParameters()
+fitparams_flag  = gf.FitParametersFlag()  # Which parameters to vary
+fitparams_bound = gf.FitParametersBound()  # Parameter bounds
+priors          = gf.Priors()              # Prior distributions
+seed_fitparams  = gf.FitParameters()       # Initial values
 
 #####################################################################################
-# set the initial nuisance parameters to be some random values according to the 
-# centers and widths of the priors
+# Set Priors and Random Initial Values
+# Configure priors and randomly initialize starting parameter values
 #####################################################################################
-np.random.seed(100)
+np.random.seed(100)  # For reproducibility
 print('Initializing with the following randomly-seeded nuisance params:')
 
-for sname in syst_dict.keys() : 
-    exec('fitparams_flag.'+sname+' = syst_dict[\"'+sname+'\"][0]')
-    exec('fitparams_bound.'+sname+'Min = syst_dict[\"'+sname+'\"][4]')
-    exec('fitparams_bound.'+sname+'Max = syst_dict[\"'+sname+'\"][5]')
-    if syst_dict[sname][1]=='Gaussian' :
-        exec('priors.'+sname+'Center = syst_dict[\"'+sname+'\"][2]')
-        exec('priors.'+sname+'Width  = syst_dict[\"'+sname+'\"][3]')
-    else :
-        exec('priors.'+sname+'Min = syst_dict[\"'+sname+'\"][4]')
-        exec('priors.'+sname+'Max = syst_dict[\"'+sname+'\"][5]')
-        
-
+for sname in syst_dict.keys():
+    # Set flags and bounds
+    exec(f'fitparams_flag.{sname} = syst_dict["{sname}"][0]')
+    exec(f'fitparams_bound.{sname}Min = syst_dict["{sname}"][4]')
+    exec(f'fitparams_bound.{sname}Max = syst_dict["{sname}"][5]')
+    
+    # Set priors
+    if syst_dict[sname][1] == 'Gaussian':
+        exec(f'priors.{sname}Center = syst_dict["{sname}"][2]')
+        exec(f'priors.{sname}Width  = syst_dict["{sname}"][3]')
+    else:
+        exec(f'priors.{sname}Min = syst_dict["{sname}"][4]')
+        exec(f'priors.{sname}Max = syst_dict["{sname}"][5]')
+    
+    # Randomly initialize
     thrown_val = throw(syst_dict[sname])
-    exec('seed_fitparams.'+sname+' = thrown_val')
-    print(sname+' '+str(thrown_val))
-    #exec('seed_fitparams.'+sname+' = syst_dict[\"'+sname+'\"][2]')
-
+    exec(f'seed_fitparams.{sname} = thrown_val')
+    print(f'{sname}: {thrown_val}')
 
 #####################################################################################
-# set paths to relevant splines and fastMC
+# Set Correlations and Paths
+# Load correlation matrices for ice gradients and flux parameters
 #####################################################################################
 gollumdir = "../../gollumfit-release"
 
-#set correlations, which are not required for evaluating the likelihood but which are required for fitting / minimization
+# Set correlations (required for fitting/minimization, not for likelihood evaluation)
 iceg_corr = np.load('../../resources/IceGradientsMaker/icegrad_correlations.npy')
 flux_corr = np.load('../../resources/DDMFluxMaker/flux_correlations_new_ddmnodeis.npy')
-for idx, val in np.ndenumerate(iceg_corr): priors.SetIceGradientsCorr(idx[0],idx[1],val)
-for idx, val in np.ndenumerate(flux_corr): priors.SetFluxCorr(idx[0],idx[1],val)
+for idx, val in np.ndenumerate(iceg_corr):
+    priors.SetIceGradientsCorr(idx[0], idx[1], val)
+for idx, val in np.ndenumerate(flux_corr):
+    priors.SetFluxCorr(idx[0], idx[1], val)
 
 datapaths = gf.DataPaths()
 datapaths.domeff_spline_path      = "../../resources/Splines/DOMEffSplines/new_ddmnodeis/BDT/DnnEnergy_0.99"
@@ -119,30 +140,33 @@ datapaths.holeice_spline_path     = "../../resources/Splines/HoleIceSplines/new_
 datapaths.attenuation_spline_path = "../../resources/Splines/AttenuationSplines/new_ddmnodeis"
 datapaths.compact_file_path       = "../FastMC/example.fastmc"
 
-
 #####################################################################################
-# steering params to set the binning 
+# Configure Steering Parameters
+# Set binning and convergence criteria (must match FastMC binning)
 #####################################################################################
-edges = np.logspace(np.log10(300),np.log10(1e5),25)
+edges = np.logspace(np.log10(300), np.log10(1e5), 25)
 steering_params                = gf.SteeringParams()
 steering_params.minFitEnergy   = edges[0]
 steering_params.maxFitEnergy   = edges[-1]
 steering_params.logEbinEdge    = np.log10(edges[0])
-steering_params.logEbinWidth   = np.log10(edges[1])-np.log10(edges[0])
-steering_params.minCosth       = -1
-steering_params.maxCosth       = 0.
+steering_params.logEbinWidth   = np.log10(edges[1]) - np.log10(edges[0])
+steering_params.minCosth       = -1.0
+steering_params.maxCosth       = 0.0
 steering_params.cosThbinEdge   = 0.0
 steering_params.cosThbinWidth  = 0.05
 steering_params.selectionStart = float("DnnEnergy_0.99".split("_")[1])
 steering_params.evalThreads    = 1
+
+# Convergence criteria (tight tolerances for accurate minimization)
 steering_params.change_tol     = 1.e-20
 steering_params.grad_tol       = 1.e-20
-steering_params.uncertaintyModSigmaOverMu = 0.
+steering_params.uncertaintyModSigmaOverMu = 0.0
 
 #####################################################################################
-# declare gollumfit object
+# Load Data and Configure Fit
+# Create GollumFit object and load pseudo-data
 #####################################################################################
-gollumfit = gf.GollumFit(datapaths,steering_params)
+gollumfit = gf.GollumFit(datapaths, steering_params)
 
 #####################################################################################
 # declare the fake data location and load it

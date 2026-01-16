@@ -1,3 +1,13 @@
+"""
+Generate Expectation Histograms Example
+
+This script demonstrates how to generate expectation histograms for different
+nuisance parameter values using a FastMC file.
+
+Example command:
+    nohup time python ./generate_expectation.py example_label > generate_expectation.out 2>&1 &
+"""
+
 import GollumFitPy as gf
 import numpy as np
 import sys
@@ -5,16 +15,18 @@ import h5py
 from collections import OrderedDict
 import scipy.stats as stats
 
-# example command:
-# nohup time python ./generate_expectation.py example_label > generate_expectation.out 2>&1 &
-
 expectation_label = sys.argv[1]
 
 #####################################################################################
-# Dict to define all the systematics, the centers, and widths
-# [ bool whether to turn off, prior shape, center, width, lower limit, upper limit ]
+# Define Nuisance Parameters
+# Format: [vary_flag, prior_type, center, width, lower_bound, upper_bound]
+# - vary_flag: False to vary in fit, True to fix
+# - prior_type: 'Gaussian' or 'Uniform'
+# - center: Central value
+# - width: 1-sigma width for Gaussian
+# - lower_bound, upper_bound: Parameter bounds
 #####################################################################################
-syst_dict     = OrderedDict({ 
+syst_dict = OrderedDict({ 
     'convNorm'                  : [ True, 'Gaussian',      1.,   0.2,                   0.1,                   3. ], 
     'zenithCorrection'          : [ True, 'Gaussian',      0.,    1.,                   -3.,                   3. ], 
     'kaonLosses'                : [ True, 'Gaussian',      0.,    1.,                   -3.,                   3. ], 
@@ -79,20 +91,24 @@ steering_params.cosThbinWidth                   = 0.05
 steering_params.selectionStart                  = float("DnnEnergy_0.99".split("_")[1])
 steering_params.evalThreads                     = 1
 
-energybincount = (np.log10(steering_params.maxFitEnergy) - np.log10(steering_params.minFitEnergy))/steering_params.logEbinWidth
-costhbincount = (steering_params.maxCosth - steering_params.minCosth)/steering_params.cosThbinWidth 
+# Calculate bin counts for output file structure
+energybincount = int((np.log10(steering_params.maxFitEnergy) - 
+                      np.log10(steering_params.minFitEnergy)) / steering_params.logEbinWidth)
+costhbincount = int((steering_params.maxCosth - steering_params.minCosth) / 
+                    steering_params.cosThbinWidth)
 
 #####################################################################################
-# declare gollumfit object
+# Initialize GollumFit
 #####################################################################################
-gollumfit = gf.GollumFit(datapaths,steering_params)
+gollumfit = gf.GollumFit(datapaths, steering_params)
 
 #####################################################################################
-# Define output file
+# Prepare Output File
+# Create an HDF5 file to store expectations and corresponding parameter values
 #####################################################################################
-print("Entering bin weights generation loop.")
-outfilename = expectation_label+'.h5'
-print('Results will be saved to '+outfilename+".")
+print("Setting up expectation generation.")
+outfilename = f'{expectation_label}.h5'
+print(f'Results will be saved to {outfilename}.')
 
 with h5py.File(outfilename, 'a') as hf:
     #####################################################################################
@@ -135,27 +151,24 @@ with h5py.File(outfilename, 'a') as hf:
         hist = gollumfit.GetExpectation(fitparams)
         
         # recover the 38 nusiance param values too
-        nusianceparams = np.empty((len(syst_dict),), dtype=np.float64)
+        nuisanceparams = np.empty((len(syst_dict),), dtype=np.float64)
         for i in range(len(list(syst_dict.keys()))):
-            exec('nusianceparams[i] = fitparams.'+list(syst_dict.keys())[i])
+            exec('nuisanceparams[i] = fitparams.'+list(syst_dict.keys())[i])
         #####################################################################################
-        # Write the values to datasets
-        ##################################################################################### 
-        # Get the current shape of the dataset
+        # Save to HDF5 File
+        # Histograms are separated by event type: starting and throughgoing
+        #####################################################################################
+        # Get current dataset shapes
         s_h = histdataset.shape
         s_p = paramsdataset.shape
-
-        # Calculate the new shape after appending
-        s_h_new = (s_h[0] + 1, s_h[1], s_h[2], s_h[3])
-        s_p_new = (s_p[0] + 1, s_p[1])
-    
-        # Resize the dataset to accommodate the new data
-        histdataset.resize(s_h_new)
-        paramsdataset.resize(s_p_new)
         
-        # Append the new data to the dataset
+        # Resize datasets to accommodate new data
+        histdataset.resize((s_h[0] + 1, s_h[1], s_h[2], s_h[3]))
+        paramsdataset.resize((s_p[0] + 1, s_p[1]))
+        
+        # Append new data
         histdataset[s_h[0]:] = hist
-        paramsdataset[s_p[0]:] = nusianceparams
+        paramsdataset[s_p[0]:] = nuisanceparams
         ###########################################################################
 
 print("Done. Data saved to "+outfilename)    
