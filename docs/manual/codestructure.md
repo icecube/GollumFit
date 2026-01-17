@@ -16,10 +16,10 @@ The GollumFit program is organized in a straightforward, modular architecture:
 
 3. `WeighterMaker` Class: Handles event re-weighting by constructing individual weighters that calculate weight adjustments for each event based on nuisance parameter values.
 
-### Architecture Diagram
+### Component Diagram
 
-![GollumFit Architecture](codestructure_diagram.png)
-*Figure: High-level architecture showing the relationship between main components. (Replace with your figure)* 
+<img src="GFdiagram.png" alt="component diagram" style="width: 80%; max-width: 900px;">
+*Figure: High-level graph showing the relationship between main components.* 
 
 ## Nuisance Parameters
 
