@@ -2,7 +2,7 @@
 
 GollumFit is an open-source framework developed by IceCube for performing binned-likelihood, high energy, diffuse, neutrino telescope analyses. In particular, GollumFit handles the fitting of monte carlo to data where the monte carlo may be parametrized by a large number of model parameters such as detector efficiencies and neutrino fluxes. We include model parameters common to all neutrino telescopes.
 
-For details on the code, installation, usage, and examples, please visit the official documentation at [https://docs.icecube.aq/gollumfit/main/index.html](https://docs.icecube.aq/golemfit/main/index.html).
+For details on the code, installation, usage, and examples, please visit the official documentation at [https://docs.icecube.aq/gollumfit/main/index.html](https://docs.icecube.aq/gollumfit/main/index.html).
 
 
 ## Getting Started
