@@ -46,7 +46,7 @@ find_package(){
 	eval ${VAR_PREFIX}_INCDIR=\"`pkg-config --variable=includedir $PKG`\"
 	eval ${VAR_PREFIX}_LIBDIR=\"`pkg-config --variable=libdir $PKG`\"
 }
-
+ 
 try_find_photospline(){
 	if [ ! "$PHOTOSPLINE_CONFIG" ]; then
 		PHOTOSPLINE_CONFIG="photospline-config"
@@ -653,17 +653,12 @@ LD=$LD
 DYN_SUFFIX=$DYN_SUFFIX
 DYN_OPT=$DYN_OPT
 DYN_OPT_PY=$DYN_OPT_PY
-
 VERSION=$VERSION
 PREFIX=$PREFIX
 " > ./Makefile
 
 echo '
 PATH_GF=$(shell pwd)
-
-GIT_HASH  = $(shell git rev-parse HEAD 2>/dev/null || echo unknown)
-GIT_DIRTY = $(shell git diff --quiet --ignore-submodules HEAD 2>/dev/null || echo dirty)
-BUILD_UTC = $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 SOURCES = $(PATH_GF)/src/analysisWeighting.cpp \
           $(PATH_GF)/src/GollumParameters.cpp \
@@ -796,14 +791,6 @@ all: $(STAT_PRODUCT) $(DYN_PRODUCT)
 clean:
 	rm -rf $(OBJECTS) $(DYN_PRODUCT) $(STAT_PRODUCT) *.o
 
-$(INC_GF)/build_info.h : 
-	@printf "%s\n" "#pragma once" >  $@
-	@printf "%s\n" "namespace buildinfo {" >> $@
-	@printf "%s\n" "inline constexpr const char* GIT_HASH = $(GIT_HASH);" >> $@
-	@printf "%s\n" "inline constexpr bool GIT_DIRTY = $(if $(filter dirty,$(GIT_DIRTY)),true,false);" >> $@
-	@printf "%s\n" "inline constexpr const char* BUILD_TIME_UTC = $(BUILD_UTC);" >> $@
-	@printf "%s\n" "}" >> $@
-
 $(LIB_GF)/analysisWeighting.o : $(SRC_GF)/analysisWeighting.cpp $(INC_GF)/analysisWeighting.h
 	$(CXX) $(CXXFLAGS) $(SRC_GF)/analysisWeighting.cpp -c -o $(LIB_GF)/analysisWeighting.o
 
@@ -859,6 +846,32 @@ uninstall:
 	@rm -f $(PREFIX)/$(STAT_PRODUCT)
 	@echo Removing config information from $(PREFIX)/lib/pkgconfig
 	@rm -f $(PREFIX)/lib/pkgconfig/gollumfit.pc
+' >> ./Makefile
+
+echo '
+GIT_REF  := $(shell sed -n "s/^ref: //p" .git/HEAD 2>/dev/null)
+GIT_DEPS := .git/HEAD .git/index .git/packed-refs
+ifneq ($(strip $(GIT_REF)),)
+  GIT_DEPS += .git/$(GIT_REF)
+endif
+
+${INC_GF}/build_info.h: $(GIT_DEPS)
+	@GIT_HASH=$$(git rev-parse HEAD 2>/dev/null || echo unknown); \
+	DIRTY=$$(git diff --quiet --ignore-submodules HEAD 2>/dev/null && \
+	         git diff --quiet --ignore-submodules --cached 2>/dev/null && \
+	         echo false || echo true); \
+	BUILD_UTC=$$(date -u +"%Y-%m-%dT%H:%M:%SZ"); \
+    BUILD_USER=$$(id -un 2>/dev/null || echo "$$USER"); \
+	{ \
+	  printf "%s\n" "#pragma once"; \
+	  printf "%s\n" "namespace buildinfo {"; \
+	  printf "%s\n" "inline constexpr const char* GIT_HASH = \"$$GIT_HASH\";"; \
+	  printf "%s\n" "inline constexpr bool GIT_DIRTY = $$DIRTY;"; \
+	  printf "%s\n" "inline constexpr const char* BUILD_TIME_UTC = \"$$BUILD_UTC\";"; \
+      printf "%s\n" "inline constexpr const char* BUILD_USER = \"$$BUILD_USER\";"; \
+	  printf "%s\n" "}"; \
+	} > $@
+
 ' >> ./Makefile
 
 if [ "$PYTHON_BINDINGS" ]; then
