@@ -13,7 +13,7 @@ This section provides comprehensive, self-contained examples demonstrating Gollu
 
 Example Monte Carlo (5 files generated from IceCube software) must be downloaded and extracted:
 - **Download**: [https://doi.org/10.7910/DVN/5DSDTD](https://doi.org/10.7910/DVN/5DSDTD)
-- **Extract to**: `GollumFit/monte_carlo/STERILE`
+- **Extract to**: `GollumFit/monte_carlo`
 
 **Nuisance Parameter Resources:**
 
@@ -113,10 +113,10 @@ metascaling = 0.25
 gollumfit.ConstructFastMode(metascaling)
 
 # Write to current directory
-gollumfit.WriteCompact(".")
+gollumfit.WriteCompact("compact.fastmc")
 ```
 
-**Output**: A `STERILE.meows` file containing the compressed FastMC. To use this in subsequent analyses, set `DataPaths.compact_file_path` to the directory containing this file.
+**Output**: A `compact.fastmc` file containing the compressed FastMC. To use this in subsequent analyses, set `DataPaths.compact_file_path` to this file.
 
 ---
 
@@ -174,7 +174,7 @@ datapaths = gf.DataPaths()
 datapaths.domeff_spline_path      = "../../resources/Splines/DOMEffSplines/new_ddmnodeis/BDT/DnnEnergy_0.99"
 datapaths.holeice_spline_path     = "../../resources/Splines/HoleIceSplines/new_ddmnodeis/BDT/DnnEnergy_0.99"
 datapaths.attenuation_spline_path = "../../resources/Splines/AttenuationSplines/new_ddmnodeis"
-datapaths.compact_file_path       = "../FastMC"
+datapaths.compact_file_path       = "../FastMC/compact.fastmc"
 ```
 
 #### Set Steering Parameters and Initialize
@@ -385,7 +385,7 @@ datapaths = gf.DataPaths()
 datapaths.domeff_spline_path      = "../../resources/Splines/DOMEffSplines/new_ddmnodeis/BDT/DnnEnergy_0.99"
 datapaths.holeice_spline_path     = "../../resources/Splines/HoleIceSplines/new_ddmnodeis/BDT/DnnEnergy_0.99"
 datapaths.attenuation_spline_path = "../../resources/Splines/AttenuationSplines/new_ddmnodeis"
-datapaths.compact_file_path       = "../FastMC"
+datapaths.compact_file_path       = "../FastMC/compact.fastmc"
 
 steering_params = gf.SteeringParams()
 steering_params.minFitEnergy                    = 300
@@ -531,7 +531,7 @@ datapaths = gf.DataPaths()
 datapaths.domeff_spline_path      = "../../resources/Splines/DOMEffSplines/new_ddmnodeis/BDT/DnnEnergy_0.99"
 datapaths.holeice_spline_path     = "../../resources/Splines/HoleIceSplines/new_ddmnodeis/BDT/DnnEnergy_0.99"
 datapaths.attenuation_spline_path = "../../resources/Splines/AttenuationSplines/new_ddmnodeis"
-datapaths.compact_file_path       = "../FastMC"
+datapaths.compact_file_path       = "../FastMC/compact.fastmc"
 ```
 
 #### Configure Steering Parameters
