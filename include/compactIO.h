@@ -10,6 +10,7 @@
 #include "build_info.h"
 #include "Event.h"
 #include "GollumMCSet.h"
+#include "utils.h"
 
 /**
 * @file CompactIO.h

@@ -84,7 +84,8 @@ void splatData(const std::string& filename, const uint32_t progChecksum, const s
         + "\"git_hash\":\"" + buildinfo::GIT_HASH + "\","
         + "\"git_dirty\":" + (buildinfo::GIT_DIRTY ? "true" : "false") + ","
         + "\"build_time_utc\":\"" + buildinfo::BUILD_TIME_UTC + "\","
-        + "\"build_user\":\"" + std::string(buildinfo::BUILD_USER) + "\""
+        + "\"build_user\":\"" + std::string(buildinfo::BUILD_USER) + "\","
+        + "\"file_generation_time_utc\":\"" + get_current_datetime_string() + "\""
         + "}";
 	const uint32_t meta_length = static_cast<uint32_t>(metadata.size());
 
