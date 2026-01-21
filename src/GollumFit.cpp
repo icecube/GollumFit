@@ -81,7 +81,7 @@ void GollumFit::LoadMC(){
 
   double livetime=steeringParams_.fullLivetime;
 
-  std::vector<MCSet> simSetsToLoad = sterile::GetSimulationSets(steeringParams_.simToLoad, dataPaths_.mc_path+ "/STERILE");
+  std::vector<MCSet> simSetsToLoad = sterile::GetSimulationSets(steeringParams_.simToLoad, dataPaths_.mc_path);
 
   auto simAction=[&](RecordID id, Event& e, double number_of_files, const DOMEfficiencySetter<Event>& domEff, const HoleIceSetter<Event>& holeIce){
 
@@ -485,7 +485,7 @@ void GollumFit::ConstructFluxWeighter(){
 void GollumFit::ConstructMonteCarloGenerationWeighter(){
   mcw_.clear();
 
-  std::vector<MCSet> simSetsToLoad = sterile::GetSimulationSets(steeringParams_.simToLoad, dataPaths_.mc_path+ "/STERILE");
+  std::vector<MCSet> simSetsToLoad = sterile::GetSimulationSets(steeringParams_.simToLoad, dataPaths_.mc_path);
   for(auto simset: simSetsToLoad ){
     for(auto g : simset.generators){
       mcw_.emplace_back(g);
