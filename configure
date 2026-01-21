@@ -661,6 +661,10 @@ PREFIX=$PREFIX
 echo '
 PATH_GF=$(shell pwd)
 
+GIT_HASH  = $(shell git rev-parse HEAD 2>/dev/null || echo unknown)
+GIT_DIRTY = $(shell git diff --quiet --ignore-submodules HEAD 2>/dev/null || echo dirty)
+BUILD_UTC = $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+
 SOURCES = $(PATH_GF)/src/analysisWeighting.cpp \
           $(PATH_GF)/src/GollumParameters.cpp \
           $(PATH_GF)/src/compactIO.cpp \
@@ -792,6 +796,14 @@ all: $(STAT_PRODUCT) $(DYN_PRODUCT)
 clean:
 	rm -rf $(OBJECTS) $(DYN_PRODUCT) $(STAT_PRODUCT) *.o
 
+$(INC_GF)/build_info.h : 
+	@printf "%s\n" "#pragma once" >  $@
+	@printf "%s\n" "namespace buildinfo {" >> $@
+	@printf "%s\n" "inline constexpr const char* GIT_HASH = $(GIT_HASH);" >> $@
+	@printf "%s\n" "inline constexpr bool GIT_DIRTY = $(if $(filter dirty,$(GIT_DIRTY)),true,false);" >> $@
+	@printf "%s\n" "inline constexpr const char* BUILD_TIME_UTC = $(BUILD_UTC);" >> $@
+	@printf "%s\n" "}" >> $@
+
 $(LIB_GF)/analysisWeighting.o : $(SRC_GF)/analysisWeighting.cpp $(INC_GF)/analysisWeighting.h
 	$(CXX) $(CXXFLAGS) $(SRC_GF)/analysisWeighting.cpp -c -o $(LIB_GF)/analysisWeighting.o
 
@@ -810,7 +822,7 @@ $(LIB_GF)/GollumTools.o : $(SRC_GF)/GollumTools.cpp $(INC_GF)/GollumTools.h
 $(LIB_GF)/GollumEnumDefinitions.o : $(SRC_GF)/GollumEnumDefinitions.cpp $(INC_GF)/GollumEnumDefinitions.h
 	$(CXX) $(CXXFLAGS) $(SRC_GF)/GollumEnumDefinitions.cpp -c -o $(LIB_GF)/GollumEnumDefinitions.o
 
-$(LIB_GF)/utils.o : $(SRC_GF)/utils.cpp $(INC_GF)/utils.h
+$(LIB_GF)/utils.o : $(SRC_GF)/utils.cpp $(INC_GF)/utils.h $(INC_GF)/build_info.h
 	$(CXX) $(CXXFLAGS) $(SRC_GF)/utils.cpp -c -o $(LIB_GF)/utils.o
 
 $(LIB_GF)/GollumFit.o : $(SRC_GF)/GollumFit.cpp $(INC_GF)/Event.h $(INC_GF)/analysisWeighting.h $(INC_GF)/compactIO.h $(INC_GF)/GollumFit.h $(INC_GF)/GollumParameters.h $(INC_GF)/GollumEnumDefinitions.h $(INC_GF)/FastMode.h
