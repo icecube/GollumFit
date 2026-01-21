@@ -196,12 +196,10 @@ void unsplatData(const std::string& filename, const uint32_t expectedChecksum, s
         uint32_t meta_length = 0;
         crc_read(datafile, fileCRC, &meta_length, sizeof(meta_length));
 
-        // Read and ignore metadata for now (you can store it if you want)
         std::string metadata(meta_length, '\0');
         if (meta_length > 0)
             crc_read(datafile, fileCRC, metadata.data(), metadata.size());
 
-        // Now the same as old format, but with version-dependent count type
         uint32_t storedProgChecksum = 0;
         crc_read(datafile, fileCRC, &storedProgChecksum, sizeof(storedProgChecksum));
         if (storedProgChecksum != expectedChecksum) {
