@@ -1,10 +1,4 @@
-#include <fstream>
-#include <boost/crc.hpp>
-#include <PhysTools/tableio.h>
-
 #include "compactIO.h"
-#include "Event.h"
-#include "analysisWeighting.h"
 
 /**
 * @file CompactIO.cpp
@@ -44,6 +38,25 @@ uint32_t getFileChecksum(const std::string& filename){
 }
 
 
+// Functions to simplify reading/writing the compact data files
+static void crc_write(std::ofstream& out, 
+                      boost::crc_32_type& crc,
+                      const void* ptr, 
+                      size_t n) {
+    out.write(reinterpret_cast<const char*>(ptr), n);
+    crc.process_bytes(ptr, n);
+}
+
+static void crc_read(std::ifstream& in, 
+                     boost::crc_32_type& crc,
+                     void* ptr, 
+                     size_t n)
+{
+    in.read(reinterpret_cast<char*>(ptr), n);
+    if (!in) throw std::runtime_error("Unexpected EOF / read failure");
+    crc.process_bytes(ptr, n);
+}
+
 /**
 * @brief Writes experimental and simulation event data to a file, along with checksums.
 *
@@ -61,30 +74,45 @@ void splatData(const std::string& filename, const uint32_t progChecksum, const s
 	std::ofstream datafile(filename);
 	if(!datafile)
 		throw std::runtime_error("Unable to open "+filename+" for writing");
-	size_t size;
 	boost::crc_32_type fileCRC;
-	
-	datafile.write((char*)&progChecksum,sizeof(progChecksum));
-	fileCRC.process_bytes((char*)&progChecksum,sizeof(progChecksum));
-	
-	size=exp.size();
-	datafile.write((char*)&size,sizeof(size));
-	fileCRC.process_bytes((char*)&size,sizeof(size));
-	for(const Event& e : exp){
-		datafile.write((char*)&e,sizeof(e));
-		fileCRC.process_bytes((char*)&e,sizeof(e));
-	}
-	
-	size=sim.size();
-	datafile.write((char*)&size,sizeof(size));
-	fileCRC.process_bytes((char*)&size,sizeof(size));
-	for(const Event& e : sim){
-		datafile.write((char*)&e,sizeof(e));
-		fileCRC.process_bytes((char*)&e,sizeof(e));
-	}
-	
-	uint32_t checksum=fileCRC.checksum();
-	datafile.write((char*)&checksum,sizeof(checksum));
+
+    const char format_header[8] = "FASTMC";
+    const uint32_t format_version = 1;
+
+    const std::string metadata =
+        std::string("{")
+        + "\"git_hash\":\"" + buildinfo::GIT_HASH + "\","
+        + "\"git_dirty\":" + (buildinfo::GIT_DIRTY ? "true" : "false") + ","
+        + "\"build_time_utc\":\"" + buildinfo::BUILD_TIME_UTC + "\","
+        + "\"build_user\":\"" + std::string(buildinfo::BUILD_USER) + "\","
+        + "\"file_generation_time_utc\":\"" + get_current_datetime_string() + "\""
+        + "}";
+	const uint32_t meta_length = static_cast<uint32_t>(metadata.size());
+
+    // write the different types of meta data
+    crc_write(datafile, fileCRC, format_header, sizeof(format_header));
+    crc_write(datafile, fileCRC, &format_version, sizeof(format_version));
+    crc_write(datafile, fileCRC, &meta_length, sizeof(meta_length));
+    crc_write(datafile, fileCRC, metadata.data(), metadata.size());
+
+    crc_write(datafile, fileCRC, &progChecksum, sizeof(progChecksum));
+
+    // write exp data
+    uint64_t n = static_cast<uint64_t>(exp.size());
+    crc_write(datafile, fileCRC, &n, sizeof(n));
+    for (const Event& e : exp) {
+        crc_write(datafile, fileCRC, &e, sizeof(e));
+    }
+
+    // write sim
+    n = static_cast<uint64_t>(sim.size());
+    crc_write(datafile, fileCRC, &n, sizeof(n));
+    for (const Event& e : sim) {
+        crc_write(datafile, fileCRC, &e, sizeof(e));
+    }
+
+    const uint32_t checksum = fileCRC.checksum();
+    datafile.write(reinterpret_cast<const char*>(&checksum), sizeof(checksum));
 }
 
 
@@ -109,49 +137,121 @@ void unsplatData(const std::string& filename, const uint32_t expectedChecksum, s
 	if(!datafile)
 		throw std::runtime_error("Unable to open "+filename+" for reading");
 	boost::crc_32_type fileCRC;
+
+    // look for the "FASTMC" header
+    char header[8] = {};
+    datafile.read(header, sizeof(header));
+    const char expected_header[8] = "FASTMC"; // expands to FASTMC\0\0
+    const bool found_header = (std::memcmp(header, expected_header, sizeof(expected_header)) == 0);
 	
-	//read checksum; check it
-	uint32_t storedChecksum;
-	datafile.read((char*)&storedChecksum,sizeof(storedChecksum));
-	fileCRC.process_bytes((char*)&storedChecksum,sizeof(storedChecksum));
-	if(storedChecksum!=expectedChecksum){
-		std::ostringstream ss;
-		ss << "Program checksum stored in " << filename << ", " << std::hex << storedChecksum << ", does not match expected (current) checksum, " << expectedChecksum;
-		throw std::runtime_error(ss.str());
-	}
-	
-	size_t size;
-	const size_t maxEvents=5e7; //as a vague sort-of safety check assume that there will never be more than 50 million events
-	datafile.read((char*)&size,sizeof(size));
-	fileCRC.process_bytes((char*)&size,sizeof(size));
-	if(size>maxEvents)
-		throw std::runtime_error(filename+" claims to contain "+boost::lexical_cast<std::string>(size)
-								 +" experimental events, which is larger than the safety limit of "
-								 +boost::lexical_cast<std::string>(maxEvents));
-	exp.resize(size);
-	for(const Event& e : exp){
-		datafile.read((char*)&e,sizeof(e));
-		fileCRC.process_bytes((char*)&e,sizeof(e));
-	}
-	
-	datafile.read((char*)&size,sizeof(size));
-	fileCRC.process_bytes((char*)&size,sizeof(size));
-	if(size>maxEvents)
-		throw std::runtime_error(filename+" claims to contain "+boost::lexical_cast<std::string>(size)
-								 +" simulated events, which is larger than the safety limit of "
-								 +boost::lexical_cast<std::string>(maxEvents));
-	sim.resize(size);
-	for(const Event& e : sim){
-		datafile.read((char*)&e,sizeof(e));
-		fileCRC.process_bytes((char*)&e,sizeof(e));
-	}
-	
-	datafile.read((char*)&storedChecksum,sizeof(storedChecksum));
-	if(storedChecksum!=fileCRC.checksum()){
-		std::ostringstream ss;
-		ss << filename << " appears to be corrupted: stored checksum, " << std::hex << storedChecksum << ", does not match recomputed checksum, " << fileCRC.checksum();
-		throw std::runtime_error(ss.str());
-	}
+    if (!found_header){ // Old FastMC format
+        datafile.clear();
+        datafile.seekg(0, std::ios::beg); // move back
+        fileCRC.reset();
+
+        uint32_t storedChecksum = 0;
+        crc_read(datafile, fileCRC, &storedChecksum, sizeof(storedChecksum));
+        if(storedChecksum!=expectedChecksum){
+            std::ostringstream ss;
+            ss << "Program checksum stored in " << filename << ", " << std::hex << storedChecksum << ", does not match expected (current) checksum, " << expectedChecksum;
+            throw std::runtime_error(ss.str());
+        }
+        
+        size_t size = 0;
+        const size_t maxEvents=static_cast<size_t>(5e7); //as a vague sort-of safety check assume that there will never be more than 50 million events
+        crc_read(datafile, fileCRC, &size, sizeof(size));
+        if(size>maxEvents)
+            throw std::runtime_error(filename+" claims to contain "+boost::lexical_cast<std::string>(size)
+                                    +" experimental events, which is larger than the safety limit of "
+                                    +boost::lexical_cast<std::string>(maxEvents));
+        exp.resize(size);
+        for(Event& e : exp){
+            crc_read(datafile, fileCRC, &e, sizeof(e));
+        }
+        
+        datafile.read((char*)&size,sizeof(size));
+        fileCRC.process_bytes((char*)&size,sizeof(size));
+        if(size>maxEvents)
+            throw std::runtime_error(filename+" claims to contain "+boost::lexical_cast<std::string>(size)
+                                    +" simulated events, which is larger than the safety limit of "
+                                    +boost::lexical_cast<std::string>(maxEvents));
+        sim.resize(size);
+        for(Event& e : sim){
+            crc_read(datafile, fileCRC, &e, sizeof(e));
+        }
+        
+        uint32_t storedFileChecksum = 0;
+        datafile.read(reinterpret_cast<char*>(&storedFileChecksum), sizeof(storedFileChecksum));
+        if(storedFileChecksum!=fileCRC.checksum()){
+            std::ostringstream ss;
+            ss << filename << " appears to be corrupted: stored checksum, " << std::hex << storedFileChecksum << ", does not match recomputed checksum, " << fileCRC.checksum();
+            throw std::runtime_error(ss.str());
+        }
+        return;
+    } else { // New FastMC format
+        fileCRC.process_bytes(header, sizeof(header));
+
+        uint32_t format_version = 0;
+        crc_read(datafile, fileCRC, &format_version, sizeof(format_version));
+
+        uint32_t meta_length = 0;
+        crc_read(datafile, fileCRC, &meta_length, sizeof(meta_length));
+
+        std::string metadata(meta_length, '\0');
+        if (meta_length > 0)
+            crc_read(datafile, fileCRC, metadata.data(), metadata.size());
+
+        uint32_t storedProgChecksum = 0;
+        crc_read(datafile, fileCRC, &storedProgChecksum, sizeof(storedProgChecksum));
+        if (storedProgChecksum != expectedChecksum) {
+            std::ostringstream ss;
+            ss << "Program checksum stored in " << filename << ", " << std::hex << storedProgChecksum
+               << ", does not match expected (current) checksum, " << expectedChecksum;
+            throw std::runtime_error(ss.str());
+        }
+
+        const uint64_t maxEvents = 999'000'000ULL;
+
+        uint64_t nExp = 0;
+        crc_read(datafile, fileCRC, &nExp, sizeof(nExp));
+        if (nExp > maxEvents)
+            throw std::runtime_error(filename + " claims to contain " +
+                                     boost::lexical_cast<std::string>(nExp) +
+                                     " experimental events, which exceeds safety limit " +
+                                     boost::lexical_cast<std::string>(maxEvents));
+
+        exp.resize(static_cast<size_t>(nExp));
+        for (Event& e : exp) {
+            crc_read(datafile, fileCRC, &e, sizeof(e));
+        }
+
+        uint64_t nSim = 0;
+        crc_read(datafile, fileCRC, &nSim, sizeof(nSim));
+        if (nSim > maxEvents)
+            throw std::runtime_error(filename + " claims to contain " +
+                                     boost::lexical_cast<std::string>(nSim) +
+                                     " simulated events, which exceeds safety limit " +
+                                     boost::lexical_cast<std::string>(maxEvents));
+
+        sim.resize(static_cast<size_t>(nSim));
+        for (Event& e : sim) {
+            crc_read(datafile, fileCRC, &e, sizeof(e));
+        }
+
+        // Final CRC (not included in CRC calculation)
+        uint32_t storedFileChecksum = 0;
+        datafile.read(reinterpret_cast<char*>(&storedFileChecksum), sizeof(storedFileChecksum));
+        if (!datafile) throw std::runtime_error("Unable to read final checksum");
+        if (storedFileChecksum != fileCRC.checksum()) {
+            std::ostringstream ss;
+            ss << filename << " appears corrupted: stored checksum " << std::hex << storedFileChecksum
+               << " does not match recomputed checksum " << fileCRC.checksum();
+            throw std::runtime_error(ss.str());
+        }
+
+        return;
+    }
+
 }
 } // closing dump namespace
 

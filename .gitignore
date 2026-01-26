@@ -54,3 +54,5 @@ examples/FastMC/STERILE.meows
 
 docs/html/
 docs/xml/
+include/build_info.h
+lib/

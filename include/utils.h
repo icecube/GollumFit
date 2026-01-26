@@ -5,6 +5,11 @@
 #include <fstream>
 #include <vector>
 #include <memory>
+#include <chrono>
+#include <ctime>
+#include <iomanip>
+#include <sstream>
+#include <string>
 #include <boost/crc.hpp>
 #include <boost/shared_ptr.hpp>
 #include <hdf5.h>
@@ -77,5 +82,7 @@ namespace {
 
 std::vector<double> edgesToCenters(const std::vector<double> && edges);
 std::vector<double> edgesToCenters(const std::vector<double> & edges);
+
+std::string get_current_datetime_string();
 
 #endif //UTILS_H
