@@ -9,6 +9,7 @@
 #include <PhysTools/tableio.h>
 #include "GollumEnumDefinitions.h"
 #include "FastMode.h"
+#include "GollumParameters.h"
 
 /**
 * @file Event.h
@@ -83,6 +84,7 @@ public:
   // reconstructed quantities
   float energy;
   float zenith;
+  float inelasticity;  // Reconstructed inelasticity [0,1], NaN for throughgoing
 
   // topology
   unsigned int topology;
@@ -160,6 +162,7 @@ public:
     // reconstruction quantities
     energy(std::numeric_limits<float>::quiet_NaN()),
     zenith(std::numeric_limits<float>::quiet_NaN()),
+    inelasticity(std::numeric_limits<float>::quiet_NaN()),
     // topology
     topology(0),
     // cached quantities
@@ -225,6 +228,7 @@ public:
             ((num_events == e.num_events) || (std::isnan(num_events) && std::isnan(e.num_events))) &&
             ((energy == e.energy) || (std::isnan(energy) && std::isnan(e.energy))) &&
             ((zenith == e.zenith) || (std::isnan(zenith) && std::isnan(e.zenith))) &&
+            ((inelasticity == e.inelasticity) || (std::isnan(inelasticity) && std::isnan(e.inelasticity))) &&
             ((topology == e.topology) || (std::isnan(topology) && std::isnan(e.topology))) &&
             ((cachedConvWeight == e.cachedConvWeight) || (std::isnan(cachedConvWeight) && std::isnan(e.cachedConvWeight))) &&
             ((cachedPromptWeight == e.cachedPromptWeight) || (std::isnan(cachedPromptWeight) && std::isnan(e.cachedPromptWeight))) &&
@@ -289,6 +293,10 @@ public:
     num_events += e.num_events;
     energy += e.energy*meta_weight;
     zenith += e.zenith*meta_weight;
+    // Only accumulate inelasticity if both events have valid values (starting events)
+    if (!std::isnan(inelasticity) && !std::isnan(e.inelasticity)) {
+      inelasticity += e.inelasticity*meta_weight;
+    }
     primaryEnergy += e.primaryEnergy*meta_weight;
     primaryZenith += e.primaryZenith*meta_weight;
     primaryAzimuth += e.primaryAzimuth*meta_weight;
@@ -346,6 +354,10 @@ public:
   void operator/=(double d) {
     energy /= d;
     zenith /= d;
+    // Only divide inelasticity if it's valid (starting events)
+    if (!std::isnan(inelasticity)) {
+      inelasticity /= d;
+    }
     primaryEnergy /= d;
     primaryZenith /= d;
     primaryAzimuth /= d;
@@ -459,7 +471,10 @@ namespace sterile {
 *       The specific set of tables processed is hardcoded in the function.
 */
 template<typename CallbackType>
-void readFile(const std::string& filePath, const std::string& energyName, const double selectionStart, CallbackType action){
+void readFile(const std::string& filePath, 
+              const gollumfit::SteeringParams& sp, 
+              const double selectionStart, 
+              CallbackType action){
     using namespace phys_tools::cts;
     using namespace phys_tools::tableio;
     H5File h5file(filePath);
@@ -471,46 +486,83 @@ void readFile(const std::string& filePath, const std::string& energyName, const 
         throw std::runtime_error(filePath+" contains no tables");
     std::map<RecordID,Event> intermediateData;
 
+    std::string energy_name = sp.energyName;
+    std::string zenith_name = sp.zenithName;
+    std::string inelasticity_name = sp.inelasticityName;
+    std::string starting_score_name = sp.startingScoreName;
+
     using double_value_field = TableRow<field<double,CTS("value")>>;
 
+    // truth values
     if(tables.count("PrimaryType")){
-        readTable<double_value_field>(h5file,"PrimaryType", intermediateData,
+        readTable<double_value_field>(h5file, "PrimaryType", intermediateData,
             [&](const double_value_field& p, Event& e){
                 e.primaryType=static_cast<LW::ParticleType>(p.get<CTS("value")>());
             });
     }
 
     if(tables.count("FinalStateX")){
-        readTable<double_value_field>(h5file,"FinalStateX", intermediateData,
+        readTable<double_value_field>(h5file, "FinalStateX", intermediateData,
             [&](const double_value_field& p, Event& e){
                 e.intX=p.get<CTS("value")>();
             });
     }
 
     if(tables.count("FinalStateY")){
-        readTable<double_value_field>(h5file,"FinalStateY", intermediateData,
+        readTable<double_value_field>(h5file, "FinalStateY", intermediateData,
             [&](const double_value_field& p, Event& e){
                 e.intY=p.get<CTS("value")>();
             });
     }
 
     if(tables.count("FinalType0")){
-        readTable<double_value_field>(h5file,"FinalType0", intermediateData,
+        readTable<double_value_field>(h5file, "FinalType0", intermediateData,
             [&](const double_value_field& p, Event& e){
                 e.final_state_particle_0=static_cast<LW::ParticleType>(p.get<CTS("value")>());
             });
     }
 
     if(tables.count("FinalType1")){
-        readTable<double_value_field>(h5file,"FinalType1", intermediateData,
+        readTable<double_value_field>(h5file, "FinalType1", intermediateData,
             [&](const double_value_field& p, Event& e){
                 e.final_state_particle_1=static_cast<LW::ParticleType>(p.get<CTS("value")>());
             });
     }
 
+
+    if(tables.count("NuAzimuth")){
+        readTable<double_value_field>(h5file, "NuAzimuth", intermediateData,
+            [&](const double_value_field& p, Event& e){
+                e.primaryAzimuth=(p.get<CTS("value")>());
+            });
+    }
+
+    if(tables.count("NuZenith")){
+        readTable<double_value_field>(h5file, "NuZenith", intermediateData,
+            [&](const double_value_field& p, Event& e){
+                e.primaryZenith=(p.get<CTS("value")>());
+            });
+    }
+
+    if(tables.count("NuEnergy")){
+        readTable<double_value_field>(h5file, "NuEnergy", intermediateData,
+            [&](const double_value_field& p, Event& e){
+                e.primaryEnergy=(p.get<CTS("value")>());
+            });
+    }
+
+    if(tables.count("TotalColumnDepth")){
+        readTable<double_value_field>(h5file, "TotalColumnDepth", intermediateData,
+            [&](const double_value_field& p, Event& e){
+                e.totalColumnDepth=(p.get<CTS("value")>());
+            });
+    }
+
+    // Reconstructed values
+
     if (selectionStart!=-1) {
-        if(tables.count("DeepStart")){
-            readTable<double_value_field>(h5file,"DeepStart", intermediateData,
+        if(tables.count(starting_score_name)){
+            readTable<double_value_field>(h5file, starting_score_name, intermediateData,
                 [&](const double_value_field& p, Event& e){
                     double aux = (p.get<CTS("value")>());
                     e.topology = (aux>selectionStart) ? 0 : 1;
@@ -518,51 +570,30 @@ void readFile(const std::string& filePath, const std::string& energyName, const 
         }
     }
     else {
-        readTable<double_value_field>(h5file,"MuExZenith", intermediateData,
+        readTable<double_value_field>(h5file, zenith_name, intermediateData,
             [&](const double_value_field& p, Event& e){
                 e.topology = 3;
             });
     }
 
-    if(tables.count("MuExZenith")){
-        readTable<double_value_field>(h5file,"MuExZenith", intermediateData,
+    if(tables.count(zenith_name)){
+        readTable<double_value_field>(h5file, zenith_name, intermediateData,
             [&](const double_value_field& p, Event& e){
                 e.zenith=(p.get<CTS("value")>());
             });
     }
 
-    if(tables.count(energyName)){
-        readTable<double_value_field>(h5file,energyName, intermediateData,
+    if(tables.count(energy_name)){
+        readTable<double_value_field>(h5file, energy_name, intermediateData,
             [&](const double_value_field& p, Event& e){
                 e.energy=(p.get<CTS("value")>());
             });
     }
 
-    if(tables.count("NuAzimuth")){
-        readTable<double_value_field>(h5file,"NuAzimuth", intermediateData,
+    if(tables.count(inelasticity_name)){
+        readTable<double_value_field>(h5file, inelasticity_name, intermediateData,
             [&](const double_value_field& p, Event& e){
-                e.primaryAzimuth=(p.get<CTS("value")>());
-            });
-    }
-
-    if(tables.count("NuZenith")){
-        readTable<double_value_field>(h5file,"NuZenith", intermediateData,
-            [&](const double_value_field& p, Event& e){
-                e.primaryZenith=(p.get<CTS("value")>());
-            });
-    }
-
-    if(tables.count("NuEnergy")){
-        readTable<double_value_field>(h5file,"NuEnergy", intermediateData,
-            [&](const double_value_field& p, Event& e){
-                e.primaryEnergy=(p.get<CTS("value")>());
-            });
-    }
-
-    if(tables.count("TotalColumnDepth")){
-        readTable<double_value_field>(h5file,"TotalColumnDepth", intermediateData,
-            [&](const double_value_field& p, Event& e){
-                e.totalColumnDepth=(p.get<CTS("value")>());
+                e.inelasticity=(p.get<CTS("value")>());
             });
     }
 

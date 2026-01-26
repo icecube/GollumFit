@@ -13,6 +13,7 @@
 #include <photospline/splinetable.h>
 #include <math.h>
 
+#include "Event.h"
 #include "GollumParameters.h"
 #include "GollumTools.h"
 #include "utils.h"

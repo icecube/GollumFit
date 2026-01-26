@@ -39,6 +39,9 @@ namespace gollumfit {
         /*
         * OFFICIAL ARES SETS
         */
+        {"Cheetah_Test",MCSet(mc_dataPath,"Cheetah_Test_1.h5",{false,0},1,1.27,-1,
+                     LW::MakeGeneratorsFromLICFile(tools::CheckedFilePath(mc_dataPath + "/" + "Cheetah_Generation_data.lic",true)))
+        },
         {"BDT_Test_HE",MCSet(mc_dataPath,"BDT_19738",{true,1},992,1.27,-1,
                      LW::MakeGeneratorsFromLICFile(tools::CheckedFilePath(mc_dataPath + "/" + "Platinum_Generation_data.lic",true)))
         },
@@ -78,6 +81,10 @@ namespace gollumfit {
     */
     std::vector<MCSet> GetSimulationSets(std::string simulation_tag, std::string mc_dataPath){
       auto simulations = GetSimInfo(mc_dataPath);
+      std::cout << simulation_tag << std::endl;
+      if(simulation_tag=="Cheetah")
+          return {simulations.at("Cheetah_Test")};
+      std::cout << simulation_tag << std::endl;
 
       if(simulation_tag=="Platinum_Split_Plus_Tau")
           return {simulations.at("Platinum_Split_HE"), simulations.at("Platinum_Tau")};

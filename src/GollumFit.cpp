@@ -22,25 +22,32 @@ GollumFit::GollumFit(DataPaths dataPaths, SteeringParams steeringParams){
  * **********************************************************************************************************/
 
 /**
-* @brief Auxiliary function to bin events into a histogram.
+* @brief Auxiliary function to bin events into the appropriate histogram based on topology.
 *
 * This function takes an event and bins it into the provided histogram structure.
-* It performs several assertions on the event data to ensure the validity of the
-* event before adding it to the histogram.
+* Starting events (topology==0) are binned into the 3D histogram (inelasticity, energy, zenith).
+* Throughgoing events (topology==1) are binned into the 2D histogram (energy, zenith).
 *
-* @param h Reference to a HistType object. The histogram to bin into.
+* @param h Reference to a HistType object (tuple of StartingHistType and ThroughgoingHistType).
 * @param e Constant reference to an Event object
+* @param useStarting Whether to bin starting events
+* @param useThroughgoing Whether to bin throughgoing events
 * @throws std::logic_error If any of the assertions fail, indicating the event data is invalid.
 */
-void binner (HistType& h, const Event& e) {
-    
-    assert(e.topology >= 0);
+void binner(HistType& h, const Event& e, bool useStarting = true, bool useThroughgoing = true) {
     assert(!std::isnan(e.energy));
     assert(!std::isnan(e.zenith));
-    assert(!std::isnan(e.topology));
-    std::get<0>(h).add(e.energy,cos(e.zenith),e.topology,amount(std::cref(e)));
 
-};
+    if (e.topology == 0 && useStarting) {  // Starting event
+        // For starting events, inelasticity should be valid
+        if (!std::isnan(e.inelasticity)) {
+            std::get<0>(h).add(e.inelasticity, e.energy, cos(e.zenith), amount(std::cref(e)));
+        }
+    } else if (e.topology == 1 && useThroughgoing) {  // Throughgoing event
+        std::get<1>(h).add(e.energy, cos(e.zenith), amount(std::cref(e)));
+    }
+    // Events with other topologies or disabled histograms are skipped
+}
 
 /*************************************************************************************************************
  * Functions to read and write data
@@ -57,7 +64,7 @@ void GollumFit::LoadData(){
       sample_.push_back(e);
     };
     auto ic86Action=[&](RecordID id, Event& e){ dataAction(id,e); };
-    readFile(CheckedFilePath(dataPaths_.data_path+"IC86.h5"),"MuExEnergy",-1,ic86Action);
+    readFile(CheckedFilePath(dataPaths_.data_path+"IC86.h5"),steeringParams_,-1,ic86Action);
   } catch(std::exception& ex){
     std::cerr << "Problem loading experimental data: " << ex.what() << std::endl;
   }
@@ -225,12 +232,12 @@ void GollumFit::LoadMC(){
     if(std::get<0>(simSet.split)){
       for(unsigned int split = 0; split < std::get<1>(simSet.split); split++){
         auto path=CheckedFilePath(simSet.path+"/"+simSet.filename+"/"+simSet.filename+"_"+std::to_string(split)+".h5");
-        H5Load::sterile::readFile(path,steeringParams_.energyName,steeringParams_.selectionStart,callback);
+        H5Load::sterile::readFile(path,steeringParams_,steeringParams_.selectionStart,callback);
       }
     }
     else {
       auto path=CheckedFilePath(simSet.path+"/"+simSet.filename);
-      H5Load::sterile::readFile(path,steeringParams_.energyName,steeringParams_.selectionStart,callback);      
+      H5Load::sterile::readFile(path,steeringParams_,steeringParams_.selectionStart,callback);      
     }
   }
 
@@ -518,22 +525,41 @@ void GollumFit::ConstructDataHistogram(){
   if(not data_loaded_)
     throw std::runtime_error("No data has been loaded. Cannot construct data histogram.");
 
-  typedef std::remove_reference<decltype(std::get<0>(dataHist_))>::type Hist0;
+  // Starting histogram: 3D (inelasticity, energy, zenith)
+  StartingHistType h0(
+      LinearAxis(steeringParams_.inelasticityBinEdge, steeringParams_.inelasticityBinWidth),  // inelasticity dimension
+      LogarithmicAxis(steeringParams_.logEbinEdge, steeringParams_.logEbinWidth),              // energy dimension
+      LinearAxis(steeringParams_.cosThbinEdge, steeringParams_.cosThbinWidth)                  // zenith dimension
+  );
 
-  Hist0 h0(LogarithmicAxis(steeringParams_.logEbinEdge, steeringParams_.logEbinWidth), // energy dimension
-                       LinearAxis(steeringParams_.cosThbinEdge, steeringParams_.cosThbinWidth), // zenith dimension
-                       LinearAxis(0,1)); // topology dimension
+  // Throughgoing histogram: 2D (energy, zenith)
+  ThroughgoingHistType h1(
+      LogarithmicAxis(steeringParams_.logEbinEdge, steeringParams_.logEbinWidth),  // energy dimension
+      LinearAxis(steeringParams_.cosThbinEdge, steeringParams_.cosThbinWidth)      // zenith dimension
+  );
 
-  dataHist_ = std::make_tuple(h0);
+  dataHist_ = std::make_tuple(h0, h1);
 
+  // Set axis limits for starting histogram
   auto& data0 = std::get<0>(dataHist_);
-  data0.getAxis(0)->setLowerLimit(steeringParams_.minFitEnergy);
-  data0.getAxis(0)->setUpperLimit(steeringParams_.maxFitEnergy);
-  data0.getAxis(1)->setLowerLimit(steeringParams_.minCosth);
-  data0.getAxis(1)->setUpperLimit(steeringParams_.maxCosth);
+  data0.getAxis(0)->setLowerLimit(steeringParams_.minInelasticity);
+  data0.getAxis(0)->setUpperLimit(steeringParams_.maxInelasticity);
+  data0.getAxis(1)->setLowerLimit(steeringParams_.minFitEnergy);
+  data0.getAxis(1)->setUpperLimit(steeringParams_.maxFitEnergy);
+  data0.getAxis(2)->setLowerLimit(steeringParams_.minCosth);
+  data0.getAxis(2)->setUpperLimit(steeringParams_.maxCosth);
 
-  // fill in the histogram with the data
-  bin(sample_, dataHist_, binner);
+  // Set axis limits for throughgoing histogram
+  auto& data1 = std::get<1>(dataHist_);
+  data1.getAxis(0)->setLowerLimit(steeringParams_.minFitEnergy);
+  data1.getAxis(0)->setUpperLimit(steeringParams_.maxFitEnergy);
+  data1.getAxis(1)->setLowerLimit(steeringParams_.minCosth);
+  data1.getAxis(1)->setUpperLimit(steeringParams_.maxCosth);
+
+  // fill in the histogram with the data using the binner function with toggle flags
+  bin(sample_, dataHist_, [this](HistType& h, const Event& e) {
+      binner(h, e, useStartingHistogram_, useThroughgoingHistogram_);
+  });
 
   data_histogram_constructed_=true;
 }
@@ -542,21 +568,45 @@ void GollumFit::ConstructSimulationHistogram(){
   if(not simulation_loaded_)
     throw std::runtime_error("No simulation has been loaded. Cannot construct simulation histogram.");
 
-  typedef std::remove_reference<decltype(std::get<0>(simHist_))>::type Hist0;
+  // Initialize toggle flags from steering params
+  useStartingHistogram_ = steeringParams_.enableStartingHistogram;
+  useThroughgoingHistogram_ = steeringParams_.enableThroughgoingHistogram;
 
-  Hist0 h0(LogarithmicAxis(steeringParams_.logEbinEdge, steeringParams_.logEbinWidth), // energy dimension
-           LinearAxis(steeringParams_.cosThbinEdge, steeringParams_.cosThbinWidth),    // zenith dimension
-           LinearAxis(0,1));                                                           // topology dimension
+  // Starting histogram: 3D (inelasticity, energy, zenith)
+  StartingHistType h0(
+      LinearAxis(steeringParams_.inelasticityBinEdge, steeringParams_.inelasticityBinWidth),  // inelasticity dimension
+      LogarithmicAxis(steeringParams_.logEbinEdge, steeringParams_.logEbinWidth),              // energy dimension
+      LinearAxis(steeringParams_.cosThbinEdge, steeringParams_.cosThbinWidth)                  // zenith dimension
+  );
 
-  simHist_ = std::make_tuple(h0);
+  // Throughgoing histogram: 2D (energy, zenith)
+  ThroughgoingHistType h1(
+      LogarithmicAxis(steeringParams_.logEbinEdge, steeringParams_.logEbinWidth),  // energy dimension
+      LinearAxis(steeringParams_.cosThbinEdge, steeringParams_.cosThbinWidth)      // zenith dimension
+  );
 
+  simHist_ = std::make_tuple(h0, h1);
+
+  // Set axis limits for starting histogram
   auto& sim0 = std::get<0>(simHist_);
-  sim0.getAxis(0)->setLowerLimit(steeringParams_.minFitEnergy);
-  sim0.getAxis(0)->setUpperLimit(steeringParams_.maxFitEnergy);
-  sim0.getAxis(1)->setLowerLimit(steeringParams_.minCosth);
-  sim0.getAxis(1)->setUpperLimit(steeringParams_.maxCosth);
+  sim0.getAxis(0)->setLowerLimit(steeringParams_.minInelasticity);
+  sim0.getAxis(0)->setUpperLimit(steeringParams_.maxInelasticity);
+  sim0.getAxis(1)->setLowerLimit(steeringParams_.minFitEnergy);
+  sim0.getAxis(1)->setUpperLimit(steeringParams_.maxFitEnergy);
+  sim0.getAxis(2)->setLowerLimit(steeringParams_.minCosth);
+  sim0.getAxis(2)->setUpperLimit(steeringParams_.maxCosth);
 
-  bin(mainSimulation_, simHist_, binner);
+  // Set axis limits for throughgoing histogram
+  auto& sim1 = std::get<1>(simHist_);
+  sim1.getAxis(0)->setLowerLimit(steeringParams_.minFitEnergy);
+  sim1.getAxis(0)->setUpperLimit(steeringParams_.maxFitEnergy);
+  sim1.getAxis(1)->setLowerLimit(steeringParams_.minCosth);
+  sim1.getAxis(1)->setUpperLimit(steeringParams_.maxCosth);
+
+  // Bin events using the binner function with toggle flags
+  bin(mainSimulation_, simHist_, [this](HistType& h, const Event& e) {
+      binner(h, e, useStartingHistogram_, useThroughgoingHistogram_);
+  });
 
   simulation_histogram_constructed_=true;
 }
@@ -569,19 +619,41 @@ hist_marray GollumFit::GetDataDistribution() const {
   if(not data_histogram_constructed_)
     throw std::runtime_error("Data histogram needs to be constructed before asking for it.");
 
-  const auto& dataHist = std::get<0>(dataHist_);
+  // Get starting histogram (3D: inelasticity, energy, zenith)
+  const auto& startingHist = std::get<0>(dataHist_);
+  // Get throughgoing histogram (2D: energy, zenith)
+  const auto& throughgoingHist = std::get<1>(dataHist_);
 
-  marray<double,3> array {static_cast<size_t>(dataHist.getBinCount(2)),
-                          static_cast<size_t>(dataHist.getBinCount(1)),
-                          static_cast<size_t>(dataHist.getBinCount(0))};
+  // For backward compatibility, return a 3D array [topology][zenith][energy]
+  // where starting events are summed over inelasticity
+  size_t nTopology = 2; // 0=starting, 1=throughgoing
+  size_t nZenith = throughgoingHist.getBinCount(1);
+  size_t nEnergy = throughgoingHist.getBinCount(0);
 
-  for(size_t it=0; it<dataHist.getBinCount(2); it++){ // topology
-    for(size_t ic=0; ic<dataHist.getBinCount(1); ic++){ // zenith
-      for(size_t ie=0; ie<dataHist.getBinCount(0); ie++){ // energy
-        auto itc = static_cast<phys_tools::likelihood::entryStoringBin<std::reference_wrapper<const Event>>>(dataHist(ie,ic,it));
-        array[it][ic][ie] = 0;
+  marray<double,3> array {nTopology, nZenith, nEnergy};
+  std::fill(array.begin(),array.end(),0);
+
+  // Process starting events (sum over inelasticity)
+  if (useStartingHistogram_) {
+    for(size_t iy=0; iy<startingHist.getBinCount(0); iy++){ // inelasticity
+      for(size_t ic=0; ic<startingHist.getBinCount(2); ic++){ // zenith
+        for(size_t ie=0; ie<startingHist.getBinCount(1); ie++){ // energy
+          auto itc = static_cast<phys_tools::likelihood::entryStoringBin<std::reference_wrapper<const Event>>>(startingHist(iy,ie,ic));
+          for(Event event : itc){
+            array[0][ic][ie] += event.cachedWeight;
+          }
+        }
+      }
+    }
+  }
+
+  // Process throughgoing events
+  if (useThroughgoingHistogram_) {
+    for(size_t ic=0; ic<throughgoingHist.getBinCount(1); ic++){ // zenith
+      for(size_t ie=0; ie<throughgoingHist.getBinCount(0); ie++){ // energy
+        auto itc = static_cast<phys_tools::likelihood::entryStoringBin<std::reference_wrapper<const Event>>>(throughgoingHist(ie,ic));
         for(Event event : itc){
-          array[it][ic][ie] += event.cachedWeight;
+          array[1][ic][ie] += event.cachedWeight;
         }
       }
     }
@@ -609,28 +681,52 @@ hist_marray GollumFit::GetWeightedExpectation(std::function<double(const Event &
   if(not simulation_histogram_constructed_)
     throw std::runtime_error("Simulation histogram needs to be constructed before asking for distributions.");
 
-  const auto& simHist = std::get<0>(simHist_);
+  // Get starting histogram (3D: inelasticity, energy, zenith)
+  const auto& startingHist = std::get<0>(simHist_);
+  // Get throughgoing histogram (2D: energy, zenith)
+  const auto& throughgoingHist = std::get<1>(simHist_);
 
-  marray<double,3> array {static_cast<size_t>(simHist.getBinCount(2)),
-                          static_cast<size_t>(simHist.getBinCount(1)),
-                          static_cast<size_t>(simHist.getBinCount(0))};
+  // For backward compatibility, return a 3D array [topology][zenith][energy]
+  // where starting events are summed over inelasticity
+  size_t nTopology = 2; // 0=starting, 1=throughgoing
+  size_t nZenith = throughgoingHist.getBinCount(1);
+  size_t nEnergy = throughgoingHist.getBinCount(0);
+
+  marray<double,3> array {nTopology, nZenith, nEnergy};
   std::fill(array.begin(),array.end(),0);
 
-  for(size_t it=0; it<simHist.getBinCount(2); it++){ // topology
-    for(size_t ic=0; ic<simHist.getBinCount(1); ic++){ // zenith
-      for(size_t ie=0; ie<simHist.getBinCount(0); ie++){ // energy
-        auto itc = static_cast<phys_tools::likelihood::entryStoringBin<std::reference_wrapper<const Event>>>(simHist(ie,ic,it));
+  // Process starting events (sum over inelasticity)
+  if (useStartingHistogram_) {
+    for(size_t iy=0; iy<startingHist.getBinCount(0); iy++){ // inelasticity
+      for(size_t ic=0; ic<startingHist.getBinCount(2); ic++){ // zenith
+        for(size_t ie=0; ie<startingHist.getBinCount(1); ie++){ // energy
+          auto itc = static_cast<phys_tools::likelihood::entryStoringBin<std::reference_wrapper<const Event>>>(startingHist(iy,ie,ic));
+          double expectation=0;
+          for(auto event : itc.entries()){
+            expectation+=f(event);
+          }
+          assert(expectation>=0.0 && "Expectation cannot be negative");
+          array[0][ic][ie] += expectation;
+        }
+      }
+    }
+  }
+
+  // Process throughgoing events
+  if (useThroughgoingHistogram_) {
+    for(size_t ic=0; ic<throughgoingHist.getBinCount(1); ic++){ // zenith
+      for(size_t ie=0; ie<throughgoingHist.getBinCount(0); ie++){ // energy
+        auto itc = static_cast<phys_tools::likelihood::entryStoringBin<std::reference_wrapper<const Event>>>(throughgoingHist(ie,ic));
         double expectation=0;
         for(auto event : itc.entries()){
           expectation+=f(event);
         }
         assert(expectation>=0.0 && "Expectation cannot be negative");
-
-        array[it][ic][ie] = expectation;
+        array[1][ic][ie] = expectation;
       }
     }
   }
- 
+
   return array;
 }
 
@@ -640,6 +736,75 @@ hist_marray GollumFit::GetExpectation(FitParameters fit_params) const {
 
 hist_marray GollumFit::GetSquareExpectation(FitParameters fit_params) const {
   return GetSquareExpectation(ConvertFitParameters(fit_params));
+}
+
+starting_hist_marray GollumFit::GetStartingExpectation(std::vector<double> fit_parameters) const {
+  if(not simulation_histogram_constructed_)
+    throw std::runtime_error("Simulation histogram needs to be constructed before asking for distributions.");
+
+  auto weighter = DFWM(fit_parameters);
+  const auto& startingHist = std::get<0>(simHist_);
+
+  // 3D array: (inelasticity, energy, zenith)
+  marray<double,3> array {
+      static_cast<size_t>(startingHist.getBinCount(0)),  // inelasticity
+      static_cast<size_t>(startingHist.getBinCount(1)),  // energy
+      static_cast<size_t>(startingHist.getBinCount(2))   // zenith
+  };
+  std::fill(array.begin(),array.end(),0);
+
+  for(size_t iy=0; iy<startingHist.getBinCount(0); iy++){ // inelasticity
+    for(size_t ie=0; ie<startingHist.getBinCount(1); ie++){ // energy
+      for(size_t ic=0; ic<startingHist.getBinCount(2); ic++){ // zenith
+        auto itc = static_cast<phys_tools::likelihood::entryStoringBin<std::reference_wrapper<const Event>>>(startingHist(iy,ie,ic));
+        double expectation=0;
+        for(auto event : itc.entries()){
+          expectation+=weighter(event);
+        }
+        assert(expectation>=0.0 && "Expectation cannot be negative");
+        array[iy][ie][ic] = expectation;
+      }
+    }
+  }
+
+  return array;
+}
+
+starting_hist_marray GollumFit::GetStartingExpectation(FitParameters fp) const {
+  return GetStartingExpectation(ConvertFitParameters(fp));
+}
+
+throughgoing_hist_marray GollumFit::GetThroughgoingExpectation(std::vector<double> fit_parameters) const {
+  if(not simulation_histogram_constructed_)
+    throw std::runtime_error("Simulation histogram needs to be constructed before asking for distributions.");
+
+  auto weighter = DFWM(fit_parameters);
+  const auto& throughgoingHist = std::get<1>(simHist_);
+
+  // 2D array: (energy, zenith)
+  marray<double,2> array {
+      static_cast<size_t>(throughgoingHist.getBinCount(0)),  // energy
+      static_cast<size_t>(throughgoingHist.getBinCount(1))   // zenith
+  };
+  std::fill(array.begin(),array.end(),0);
+
+  for(size_t ie=0; ie<throughgoingHist.getBinCount(0); ie++){ // energy
+    for(size_t ic=0; ic<throughgoingHist.getBinCount(1); ic++){ // zenith
+      auto itc = static_cast<phys_tools::likelihood::entryStoringBin<std::reference_wrapper<const Event>>>(throughgoingHist(ie,ic));
+      double expectation=0;
+      for(auto event : itc.entries()){
+        expectation+=weighter(event);
+      }
+      assert(expectation>=0.0 && "Expectation cannot be negative");
+      array[ie][ic] = expectation;
+    }
+  }
+
+  return array;
+}
+
+throughgoing_hist_marray GollumFit::GetThroughgoingExpectation(FitParameters fp) const {
+  return GetThroughgoingExpectation(ConvertFitParameters(fp));
 }
 
 hist_marray GollumFit::GetRealization(std::vector<double> fit_params, int seed) const {
@@ -658,24 +823,52 @@ hist_marray GollumFit::GetRealization(std::vector<double> fit_params, int seed) 
   }
 
   std::vector<Event> realization=phys_tools::likelihood::generateSample(weights,mainSimulation_,expected,rng);
-  auto fullRealizationHist = std::make_tuple(makeEmptyHistogramCopy(std::get<0>(dataHist_)));
-  bin(realization,fullRealizationHist,binner);
-  auto& realizationHist = std::get<0>(fullRealizationHist);
+
+  // Create empty histogram copies
+  auto fullRealizationHist = std::make_tuple(
+      makeEmptyHistogramCopy(std::get<0>(dataHist_)),
+      makeEmptyHistogramCopy(std::get<1>(dataHist_))
+  );
+
+  // Bin realization events
+  bin(realization, fullRealizationHist, [this](HistType& h, const Event& e) {
+      binner(h, e, useStartingHistogram_, useThroughgoingHistogram_);
+  });
 
   if(realization.size() == 0){
     throw std::runtime_error("No events generated. Expected events are "+std::to_string(expected));
   }
 
-  marray<double,3> array {static_cast<size_t>(realizationHist.getBinCount(2)),
-                          static_cast<size_t>(realizationHist.getBinCount(1)),
-                          static_cast<size_t>(realizationHist.getBinCount(0))};
+  // Get histograms
+  const auto& startingHist = std::get<0>(fullRealizationHist);
+  const auto& throughgoingHist = std::get<1>(fullRealizationHist);
+
+  // For backward compatibility, return a 3D array [topology][zenith][energy]
+  size_t nTopology = 2;
+  size_t nZenith = throughgoingHist.getBinCount(1);
+  size_t nEnergy = throughgoingHist.getBinCount(0);
+
+  marray<double,3> array {nTopology, nZenith, nEnergy};
   std::fill(array.begin(),array.end(),0);
 
-  for(size_t it=0; it<realizationHist.getBinCount(2); it++){ // topology
-    for(size_t ic=0; ic<realizationHist.getBinCount(1); ic++){ // zenith
-      for(size_t ie=0; ie<realizationHist.getBinCount(0); ie++){ // energy
-        auto itc = static_cast<phys_tools::likelihood::entryStoringBin<std::reference_wrapper<const Event>>>(realizationHist(ie,ic,it));
-        array[it][ic][ie] = itc.size();
+  // Process starting events (sum over inelasticity)
+  if (useStartingHistogram_) {
+    for(size_t iy=0; iy<startingHist.getBinCount(0); iy++){ // inelasticity
+      for(size_t ic=0; ic<startingHist.getBinCount(2); ic++){ // zenith
+        for(size_t ie=0; ie<startingHist.getBinCount(1); ie++){ // energy
+          auto itc = static_cast<phys_tools::likelihood::entryStoringBin<std::reference_wrapper<const Event>>>(startingHist(iy,ie,ic));
+          array[0][ic][ie] += itc.size();
+        }
+      }
+    }
+  }
+
+  // Process throughgoing events
+  if (useThroughgoingHistogram_) {
+    for(size_t ic=0; ic<throughgoingHist.getBinCount(1); ic++){ // zenith
+      for(size_t ie=0; ie<throughgoingHist.getBinCount(0); ie++){ // energy
+        auto itc = static_cast<phys_tools::likelihood::entryStoringBin<std::reference_wrapper<const Event>>>(throughgoingHist(ie,ic));
+        array[1][ic][ie] = itc.size();
       }
     }
   }
@@ -1038,6 +1231,7 @@ void GollumFit::ConstructFastMode(double meta_scaling) {
   if( meta_scaling > 1. )
     throw std::runtime_error("Using metascaling greater than one can give bad results. Reconsider.");
 
+  // Meta histogram for binning in true space (primaryEnergy, primaryZenith, primaryType)
   using MetaHistType = histogram<3,entryStoringBin<std::reference_wrapper<const Event>>>;
 
   MetaHistType metaHist(LogarithmicAxis(steeringParams_.logEbinEdge, steeringParams_.logEbinWidth*meta_scaling), // energy dimension
@@ -1054,13 +1248,23 @@ void GollumFit::ConstructFastMode(double meta_scaling) {
       }
   };
 
+  // Process the combined histogram (tuple of StartingHistType and ThroughgoingHistType)
   metaEvents_ = gollumfit::fastmode::get_fastmode_events<Event>(metaHist, meta_binner, combiner(), simHist_);
 
   std::cout << "Went from this many MC events " << mainSimulation_.size() << " to " << metaEvents_.size() << std::endl;
   assert(!metaEvents_.empty());
 
-  auto newZeroHist = std::make_tuple(makeEmptyHistogramCopy(std::get<0>(simHist_)));
-  bin(metaEvents_, newZeroHist, binner);
+  // Create new empty histograms for both starting and throughgoing events
+  auto newZeroHist = std::make_tuple(
+      makeEmptyHistogramCopy(std::get<0>(simHist_)),
+      makeEmptyHistogramCopy(std::get<1>(simHist_))
+  );
+
+  // Re-bin meta events into the new histograms
+  bin(metaEvents_, newZeroHist, [this](HistType& h, const Event& e) {
+      binner(h, e, useStartingHistogram_, useThroughgoingHistogram_);
+  });
+
   simHist_ = std::move(newZeroHist);
 
   fastmode_constructed_ = true;
@@ -1377,15 +1581,23 @@ int GollumFit::CheckExpectation(std::vector<double> fit_params) const {
 
 
   std::vector<double> GollumFit::GetEnergyBinsMC() const{
-    return PullBinEdges<0>(0,simHist_);
+    // Use throughgoing histogram (index 1) for energy bins (dimension 0)
+    return PullBinEdges<1>(0,simHist_);
   }
 
   std::vector<double> GollumFit::GetZenithBinsMC() const{
-    return PullBinEdges<0>(1,simHist_);
+    // Use throughgoing histogram (index 1) for zenith bins (dimension 1)
+    return PullBinEdges<1>(1,simHist_);
   }
 
   std::vector<double> GollumFit::GetTopologyBinsMC() const{
-    return PullBinEdges<0>(2,simHist_);
+    // For backward compatibility, return bin edges for 2 topologies
+    return {0.0, 1.0, 2.0};
+  }
+
+  std::vector<double> GollumFit::GetInelasticityBinsMC() const{
+    // Use starting histogram (index 0) for inelasticity bins (dimension 0)
+    return PullBinEdges<0>(0,simHist_);
   }
 
 

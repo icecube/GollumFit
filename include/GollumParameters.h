@@ -16,7 +16,6 @@
 #include <sys/stat.h>
 #include <boost/math/constants/constants.hpp>
 
-#include "Event.h"
 #include "GollumEnumDefinitions.h"
 #include "utils.h"
 
@@ -549,7 +548,7 @@ struct DataPaths {
 * @todo add detailed descriptions for the more technical parameters, i.e. change_tol, etc. 
 */
 struct SteeringParams {
-  string readCompact="";
+  std::string readCompact="";
   double minFitEnergy;///< minimum energy
   double maxFitEnergy;///< maximum energy
   double minCosth;///< minimum cosine zenith
@@ -559,6 +558,21 @@ struct SteeringParams {
   double cosThbinEdge;///< starting bin edge in cosine zenith
   double cosThbinWidth;///< bin width in cosine zenith
   std::optional<double> astroOscAvgScale = std::nullopt;///< energy scale above which the astro component will be averaged out in the nuSQuIDSAtm class
+
+  // Inelasticity binning configuration (for starting events)
+  double inelasticityBinEdge = 0.0;   ///< starting bin edge in inelasticity
+  double inelasticityBinWidth = 0.2;  ///< bin width in inelasticity (5 bins for [0,1])
+  double minInelasticity = 0.0;       ///< minimum inelasticity
+  double maxInelasticity = 1.0;       ///< maximum inelasticity
+
+  std::string energyName = "transformer_energy";
+  std::string zenithName = "neptune_zenith";  
+  std::string inelasticityName = "transformer_inelasticity";
+  std::string startingScoreName = "starting_score";
+
+  // Histogram enable/disable toggles
+  bool enableStartingHistogram = true;     ///< Enable 3D starting events histogram (inelasticity, energy, zenith)
+  bool enableThroughgoingHistogram = true; ///< Enable 2D throughgoing events histogram (energy, zenith)
 
   std::vector<std::string> ice_gradient_filename;
   std::vector<std::string> active_hadronic_parameters;
@@ -572,9 +586,8 @@ struct SteeringParams {
   double grad_tol = 1.e-20;
   double uncertaintyModSigmaOverMu = 0.;
 
-  string model_label;
-  string simToLoad;
-  string energyName;
+  std::string model_label;
+  std::string simToLoad;
   double selectionStart;
 
   bool enableTotalNorm = true;///< If true, convNorm is applied to all flux components

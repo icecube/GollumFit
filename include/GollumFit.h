@@ -50,7 +50,15 @@ struct simpleLocalDataWeighterConstructor{
 using namespace nusquids;
 using namespace phys_tools::histograms;
 using namespace phys_tools::likelihood;
-using HistType = std::tuple< histogram<3,entryStoringBin<std::reference_wrapper<const Event>>> >;
+
+// Histogram types for inelasticity support
+// Starting events: 3D histogram (inelasticity, energy, zenith)
+using StartingHistType = histogram<3, entryStoringBin<std::reference_wrapper<const Event>>>;
+// Throughgoing events: 2D histogram (energy, zenith)
+using ThroughgoingHistType = histogram<2, entryStoringBin<std::reference_wrapper<const Event>>>;
+// Combined histogram type as tuple
+using HistType = std::tuple<StartingHistType, ThroughgoingHistType>;
+
 using PriorIndices = std::tuple<phys_tools::likelihood::parameters<>,phys_tools::likelihood::parameters<4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19>,phys_tools::likelihood::parameters<20,21,22,23,24,25,26,27,28>>;
 using BasicPrior = FixedSizePriorSet<GaussianPrior,
                                      GaussianPrior,
@@ -94,6 +102,16 @@ using BasicPrior = FixedSizePriorSet<GaussianPrior,
 using CPrior = ArbitraryPriorType<PriorIndices, BasicPrior, GaussianNDPrior<16>, GaussianNDPrior<9>>::type;
 using LType=LikelihoodProblem<std::reference_wrapper<const Event>, HistType,simpleLocalDataWeighterConstructor,sterile::WeighterMaker,CPrior,SAYLikelihoodRelativeUncertaintyMod,38>;
 using hist_marray=marray<double,3>;
+
+// New marray types for split histogram structure
+using starting_hist_marray = marray<double, 3>;      // (inelasticity, energy, zenith)
+using throughgoing_hist_marray = marray<double, 2>;  // (energy, zenith)
+
+// Result struct for combined expectation
+struct ExpectationResult {
+    starting_hist_marray starting;
+    throughgoing_hist_marray throughgoing;
+};
 
 template<typename ContainerType, typename HistType, typename BinnerType>
   void bin(const ContainerType& data, HistType& hist, const BinnerType& binner){
@@ -159,6 +177,10 @@ class GollumFit {
     bool priors_constructed_= (false);
     bool fixedParams_constructed_= (false);
     bool boundParams_constructed_= (false);
+
+    // Histogram toggle flags (runtime control)
+    bool useStartingHistogram_ = true;
+    bool useThroughgoingHistogram_ = true;
 
     // splines flags
     bool domeff_spline_loaded_ = (false);
@@ -1080,6 +1102,73 @@ class GollumFit {
     * @return A vector of doubles containing the topology bin edges of the MC histogram.
     */
     std::vector<double> GetTopologyBinsMC() const;
+
+    /**
+    * @brief Gets the inelasticity bin edges from the starting events histogram.
+    *
+    * @return A vector of doubles containing the inelasticity bin edges.
+    */
+    std::vector<double> GetInelasticityBinsMC() const;
+
+    /**
+    * @brief Computes the weighted expectation for starting events only.
+    *
+    * @param fit_parameters The parameters to be used for constructing the weighter.
+    * @return A 3D array (inelasticity, energy, zenith) for starting events.
+    */
+    starting_hist_marray GetStartingExpectation(std::vector<double> fit_parameters) const;
+
+    /**
+    * @brief Computes the weighted expectation for starting events only.
+    *
+    * @param fp The fit parameters to be converted and used.
+    * @return A 3D array (inelasticity, energy, zenith) for starting events.
+    */
+    starting_hist_marray GetStartingExpectation(FitParameters fp) const;
+
+    /**
+    * @brief Computes the weighted expectation for throughgoing events only.
+    *
+    * @param fit_parameters The parameters to be used for constructing the weighter.
+    * @return A 2D array (energy, zenith) for throughgoing events.
+    */
+    throughgoing_hist_marray GetThroughgoingExpectation(std::vector<double> fit_parameters) const;
+
+    /**
+    * @brief Computes the weighted expectation for throughgoing events only.
+    *
+    * @param fp The fit parameters to be converted and used.
+    * @return A 2D array (energy, zenith) for throughgoing events.
+    */
+    throughgoing_hist_marray GetThroughgoingExpectation(FitParameters fp) const;
+
+    /**
+    * @brief Enable or disable the starting events histogram.
+    *
+    * @param enable True to enable, false to disable.
+    */
+    void SetEnableStartingHistogram(bool enable) { useStartingHistogram_ = enable; }
+
+    /**
+    * @brief Enable or disable the throughgoing events histogram.
+    *
+    * @param enable True to enable, false to disable.
+    */
+    void SetEnableThroughgoingHistogram(bool enable) { useThroughgoingHistogram_ = enable; }
+
+    /**
+    * @brief Check if starting histogram is enabled.
+    *
+    * @return True if enabled, false otherwise.
+    */
+    bool IsStartingHistogramEnabled() const { return useStartingHistogram_; }
+
+    /**
+    * @brief Check if throughgoing histogram is enabled.
+    *
+    * @return True if enabled, false otherwise.
+    */
+    bool IsThroughgoingHistogramEnabled() const { return useThroughgoingHistogram_; }
 
     // functions to check the status of the object
 

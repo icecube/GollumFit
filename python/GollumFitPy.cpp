@@ -180,9 +180,20 @@ PYBIND11_MODULE(GollumFitPy, m)
     .def_readwrite("fullLivetime",&GF::SteeringParams::fullLivetime)
     .def_readwrite("change_tol",&GF::SteeringParams::change_tol)
     .def_readwrite("grad_tol",&GF::SteeringParams::grad_tol)
-    .def_readwrite("energyName",&GF::SteeringParams::energyName)
     .def_readwrite("selectionStart",&GF::SteeringParams::selectionStart)
     .def_readwrite("enableTotalNorm",&GF::SteeringParams::enableTotalNorm)
+    // Inelasticity binning configuration
+    .def_readwrite("inelasticityBinEdge",&GF::SteeringParams::inelasticityBinEdge)
+    .def_readwrite("inelasticityBinWidth",&GF::SteeringParams::inelasticityBinWidth)
+    .def_readwrite("minInelasticity",&GF::SteeringParams::minInelasticity)
+    .def_readwrite("maxInelasticity",&GF::SteeringParams::maxInelasticity)
+    .def_readwrite("energyName",&GF::SteeringParams::energyName)
+    .def_readwrite("zenithName",&GF::SteeringParams::zenithName)
+    .def_readwrite("inelasticityName",&GF::SteeringParams::inelasticityName)
+    .def_readwrite("startingScoreName",&GF::SteeringParams::startingScoreName)
+    // Histogram enable/disable toggles
+    .def_readwrite("enableStartingHistogram",&GF::SteeringParams::enableStartingHistogram)
+    .def_readwrite("enableThroughgoingHistogram",&GF::SteeringParams::enableThroughgoingHistogram)
   ;
 
 
@@ -454,6 +465,13 @@ PYBIND11_MODULE(GollumFitPy, m)
     .def("GetEnergyBinsMC",&GF::GollumFit::GetEnergyBinsMC)
     .def("GetZenithBinsMC",&GF::GollumFit::GetZenithBinsMC)
     .def("GetTopologyBinsMC",&GF::GollumFit::GetTopologyBinsMC)
+    .def("GetInelasticityBinsMC",&GF::GollumFit::GetInelasticityBinsMC)
+    .def("GetStartingExpectation",(nsq::marray<double,3>(GF::GollumFit::*)(GF::FitParameters)const)&GF::GollumFit::GetStartingExpectation)
+    .def("GetThroughgoingExpectation",(nsq::marray<double,2>(GF::GollumFit::*)(GF::FitParameters)const)&GF::GollumFit::GetThroughgoingExpectation)
+    .def("SetEnableStartingHistogram",&GF::GollumFit::SetEnableStartingHistogram)
+    .def("SetEnableThroughgoingHistogram",&GF::GollumFit::SetEnableThroughgoingHistogram)
+    .def("IsStartingHistogramEnabled",&GF::GollumFit::IsStartingHistogramEnabled)
+    .def("IsThroughgoingHistogramEnabled",&GF::GollumFit::IsThroughgoingHistogramEnabled)
     .def("GetExpectation",(nsq::marray<double,3>(GF::GollumFit::*)(GF::FitParameters)const)&GF::GollumFit::GetExpectation)
     .def("GetSquareExpectation",(nsq::marray<double,3>(GF::GollumFit::*)(GF::FitParameters)const)&GF::GollumFit::GetSquareExpectation)
     .def("GetRealization",(nsq::marray<double,3>(GF::GollumFit::*)(GF::FitParameters,int)const)&GF::GollumFit::GetRealization)
@@ -506,6 +524,7 @@ PYBIND11_MODULE(GollumFitPy, m)
     // Reco properties
     .def_readonly("energy",&Event::energy)
     .def_readonly("zenith",&Event::zenith)
+    .def_readonly("inelasticity",&Event::inelasticity)
   ;
 
   // to_python_converter< nsq::marray<double,1> , marray_to_numpy<1> >();
