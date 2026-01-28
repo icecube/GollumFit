@@ -871,8 +871,9 @@ class GollumFit {
     *
     * @param fit_parameters A vector of doubles containing the nuisance parameters.
     * @param seed An integer used to seed the random number generator for the realization.
-    * @return A two-dimensional array holding all the events. The four columns
-    * correspond to the energy, zenith, topology, and weight.
+    * @return A two-dimensional array (Nx5) holding all the events. The five columns
+    * correspond to energy, zenith, topology, weight, and inelasticity.
+    * For throughgoing events (topology=1), inelasticity will be NaN.
     */
     marray<double,2> GetRealizationEvents(std::vector<double> fit_parameters, int seed) const;
 
@@ -885,8 +886,9 @@ class GollumFit {
     * Note that the output is an array of events, not a binned histogram.
     *
     * @param fit_parameters A vector of doubles containing the fit parameters.
-    * @return A two-dimensional array holding all the events. The four columns
-    * correspond to the energy, zenith, topology, and weight.
+    * @return A two-dimensional array (Nx5) holding all the events. The five columns
+    * correspond to energy, zenith, topology, weight, and inelasticity.
+    * For throughgoing events (topology=1), inelasticity will be NaN.
     */
     marray<double,2> GetExpectationEvents(std::vector<double> fit_parameters) const;
 
@@ -996,6 +998,7 @@ class GollumFit {
     * This function extracts the data distribution from the constructed data histogram and
     * returns it as a multi-dimensional array. Each cell in the array corresponds to the
     * sum of the weights of the events that fall into the corresponding histogram bin.
+    * For backward compatibility, starting events are summed over inelasticity.
     *
     * @pre @c data_histogram_constructed_ must be true, indicating that the data histogram
     * has been successfully constructed.
@@ -1003,6 +1006,34 @@ class GollumFit {
     * @throws @c std::runtime_error If the data histogram has not been constructed.
     */
     hist_marray GetDataDistribution() const;
+
+    /**
+    * @brief Retrieves the starting events data distribution including inelasticity.
+    *
+    * This function extracts the data distribution for starting events from the
+    * constructed data histogram and returns it as a 3D array with dimensions
+    * (inelasticity, energy, zenith).
+    *
+    * @pre @c data_histogram_constructed_ must be true, indicating that the data histogram
+    * has been successfully constructed.
+    * @return A 3D array (inelasticity, energy, zenith) for starting events.
+    * @throws @c std::runtime_error If the data histogram has not been constructed.
+    */
+    starting_hist_marray GetStartingDataDistribution() const;
+
+    /**
+    * @brief Retrieves the throughgoing events data distribution.
+    *
+    * This function extracts the data distribution for throughgoing events from the
+    * constructed data histogram and returns it as a 2D array with dimensions
+    * (energy, zenith). Throughgoing events do not have well-defined inelasticity.
+    *
+    * @pre @c data_histogram_constructed_ must be true, indicating that the data histogram
+    * has been successfully constructed.
+    * @return A 2D array (energy, zenith) for throughgoing events.
+    * @throws @c std::runtime_error If the data histogram has not been constructed.
+    */
+    throughgoing_hist_marray GetThroughgoingDataDistribution() const;
 
     /**
     * @brief Constructs a 2D histogram of energy vs. zenith for the expected events based on fit parameters and topology.
@@ -1024,8 +1055,10 @@ class GollumFit {
     * This function creates a two-dimensional array with the contents of the
     * current data sample. Each event's attributes are stored in the array's rows.
     * Note that the output is an array of events, not a binned histogram.
+    * The columns are: energy, zenith, topology, weight, inelasticity.
+    * For throughgoing events (topology=1), inelasticity will be NaN.
     *
-    * @return A two-dimensional array representing the current data sample.
+    * @return A two-dimensional array (Nx5) representing the current data sample.
     */
     marray<double,2> GetDataEvents() const;
 
@@ -1060,11 +1093,13 @@ class GollumFit {
     *
     * This function processes an array of data events, each with several attributes,
     * and stores them into the internal @c sample_ structure. Additionally, it reconstructs the data
-    * histogram based on the new sample. 
+    * histogram based on the new sample.
     *
-    * @param Data A two-dimensional array of data where each row represents an event
-    *             with attributes such as energy, zenith, topology, and cached weight.
-    *             The input format should be the output of @c GetExpectationEvents .
+    * @param Data A two-dimensional array of data where each row represents an event.
+    *             Supports both 4-column format (energy, zenith, topology, weight) for
+    *             backward compatibility, and 5-column format (energy, zenith, topology,
+    *             weight, inelasticity) for full inelasticity support.
+    *             For throughgoing events (topology=1), inelasticity should be NaN.
     * @return The sum of weights of all data events.
     */
     double SetData(marray<double,2> Data);

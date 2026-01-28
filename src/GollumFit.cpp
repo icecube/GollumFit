@@ -662,6 +662,59 @@ hist_marray GollumFit::GetDataDistribution() const {
   return array;
 }
 
+starting_hist_marray GollumFit::GetStartingDataDistribution() const {
+  if(not data_histogram_constructed_)
+    throw std::runtime_error("Data histogram needs to be constructed before asking for it.");
+
+  const auto& startingHist = std::get<0>(dataHist_);
+
+  // 3D array: (inelasticity, energy, zenith)
+  marray<double,3> array {
+      static_cast<size_t>(startingHist.getBinCount(0)),  // inelasticity
+      static_cast<size_t>(startingHist.getBinCount(1)),  // energy
+      static_cast<size_t>(startingHist.getBinCount(2))   // zenith
+  };
+  std::fill(array.begin(),array.end(),0);
+
+  for(size_t iy=0; iy<startingHist.getBinCount(0); iy++){ // inelasticity
+    for(size_t ie=0; ie<startingHist.getBinCount(1); ie++){ // energy
+      for(size_t ic=0; ic<startingHist.getBinCount(2); ic++){ // zenith
+        auto itc = static_cast<phys_tools::likelihood::entryStoringBin<std::reference_wrapper<const Event>>>(startingHist(iy,ie,ic));
+        for(Event event : itc){
+          array[iy][ie][ic] += event.cachedWeight;
+        }
+      }
+    }
+  }
+
+  return array;
+}
+
+throughgoing_hist_marray GollumFit::GetThroughgoingDataDistribution() const {
+  if(not data_histogram_constructed_)
+    throw std::runtime_error("Data histogram needs to be constructed before asking for it.");
+
+  const auto& throughgoingHist = std::get<1>(dataHist_);
+
+  // 2D array: (energy, zenith)
+  marray<double,2> array {
+      static_cast<size_t>(throughgoingHist.getBinCount(0)),  // energy
+      static_cast<size_t>(throughgoingHist.getBinCount(1))   // zenith
+  };
+  std::fill(array.begin(),array.end(),0);
+
+  for(size_t ie=0; ie<throughgoingHist.getBinCount(0); ie++){ // energy
+    for(size_t ic=0; ic<throughgoingHist.getBinCount(1); ic++){ // zenith
+      auto itc = static_cast<phys_tools::likelihood::entryStoringBin<std::reference_wrapper<const Event>>>(throughgoingHist(ie,ic));
+      for(Event event : itc){
+        array[ie][ic] += event.cachedWeight;
+      }
+    }
+  }
+
+  return array;
+}
+
 
 hist_marray GollumFit::GetExpectation(std::vector<double> fit_parameters) const {
   auto weighter = DFWM(fit_parameters);
@@ -1526,6 +1579,10 @@ void GollumFit::ReportStatus() const {
 double GollumFit::SetData(marray<double,2> Data) {
   double TotalWeight=0;
   sample_.clear();
+
+  // Support both 4-column (backward compatible) and 5-column (with inelasticity) input
+  bool hasInelasticity = (Data.extent(1) >= 5);
+
   for(size_t i=0; i!=Data.extent(0); ++i)
     {
       Event e;
@@ -1533,6 +1590,13 @@ double GollumFit::SetData(marray<double,2> Data) {
       e.zenith       = Data[i][1];
       e.topology     = Data[i][2];
       e.cachedWeight = Data[i][3];
+
+      // Read inelasticity if provided, otherwise defaults to NaN from Event constructor
+      if(hasInelasticity) {
+        e.inelasticity = Data[i][4];
+      }
+      // Note: For throughgoing events (topology=1), inelasticity should be NaN
+
       TotalWeight+=Data[i][3];
       sample_.push_back(e);
     }
@@ -1544,12 +1608,13 @@ double GollumFit::SetData(marray<double,2> Data) {
 }
 
 marray<double,2> GollumFit::GetDataEvents() const {
-  marray<double,2> ReturnVec { sample_.size(), 4} ;
+  marray<double,2> ReturnVec { sample_.size(), 5} ;
   for(size_t i=0; i!=sample_.size(); ++i) {
       ReturnVec[i][0]=sample_[i].energy;
       ReturnVec[i][1]=sample_[i].zenith;
       ReturnVec[i][2]=sample_[i].topology;
       ReturnVec[i][3]=sample_[i].cachedWeight;
+      ReturnVec[i][4]=sample_[i].inelasticity;  // NaN for throughgoing events
   }
   return ReturnVec;
 }
@@ -1574,7 +1639,7 @@ marray<double,2> GollumFit::GetRealizationEvents( std::vector<double> nuisance, 
 
   std::vector<Event> realization=phys_tools::likelihood::generateSample(weights,mainSimulation_,expected,rng);
 
-  marray<double,2> ReturnVec { realization.size(), 4} ;
+  marray<double,2> ReturnVec { realization.size(), 5} ;
 
   for(size_t i=0; i!=realization.size(); ++i)
     {
@@ -1582,6 +1647,7 @@ marray<double,2> GollumFit::GetRealizationEvents( std::vector<double> nuisance, 
       ReturnVec[i][1]=realization[i].zenith;
       ReturnVec[i][2]=realization[i].topology;
       ReturnVec[i][3]=1.;
+      ReturnVec[i][4]=realization[i].inelasticity;  // NaN for throughgoing events
     }
   return ReturnVec;
 }
@@ -1592,13 +1658,14 @@ marray<double,2> GollumFit::GetExpectationEvents(FitParameters fit_params) const
 
 marray<double,2> GollumFit::GetExpectationEvents(std::vector<double> fit_params) const {
   const std::deque<Event> & sim = (fastmode_constructed_)?metaEvents_:mainSimulation_;
-  marray<double,2> ReturnVec {sim.size(), 4} ;
+  marray<double,2> ReturnVec {sim.size(), 5} ;
   auto weighter = DFWM(fit_params);
   for(size_t i=0; i!=sim.size(); ++i) {
       ReturnVec[i][0]=sim[i].energy;
       ReturnVec[i][1]=sim[i].zenith;
       ReturnVec[i][2]=sim[i].topology;
       ReturnVec[i][3]=weighter(sim[i]);
+      ReturnVec[i][4]=sim[i].inelasticity;  // NaN for throughgoing events
   }
   return ReturnVec;
 }
