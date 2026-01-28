@@ -574,6 +574,9 @@ struct SteeringParams {
   bool enableStartingHistogram = true;     ///< Enable 3D starting events histogram (inelasticity, energy, zenith)
   bool enableThroughgoingHistogram = true; ///< Enable 2D throughgoing events histogram (energy, zenith)
 
+  // FastMC configuration
+  bool fastMCIncludeInelasticity = false;  ///< Include reco inelasticity in FastMC meta-binning (for starting events)
+
   std::vector<std::string> ice_gradient_filename;
   std::vector<std::string> active_hadronic_parameters;
   std::vector<std::string> active_cosmicray_parameters;

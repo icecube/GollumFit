@@ -1231,27 +1231,79 @@ void GollumFit::ConstructFastMode(double meta_scaling) {
   if( meta_scaling > 1. )
     throw std::runtime_error("Using metascaling greater than one can give bad results. Reconsider.");
 
-  // Meta histogram for binning in true space (primaryEnergy, primaryZenith, primaryType)
-  using MetaHistType = histogram<3,entryStoringBin<std::reference_wrapper<const Event>>>;
-
-  MetaHistType metaHist(LogarithmicAxis(steeringParams_.logEbinEdge, steeringParams_.logEbinWidth*meta_scaling), // energy dimension
-                        LinearAxis(steeringParams_.cosThbinEdge, steeringParams_.cosThbinWidth*meta_scaling), // zenith dimension
-                        LinearAxis(0,1)); // particle type dimension
-
-  auto meta_binner = [](MetaHistType& h, const Event& e){
-    h.add(e.primaryEnergy,cos(e.primaryZenith),int(e.primaryType),amount(std::cref(e)));
-  };
-
   struct combiner {
       Event operator()(const std::vector<std::reference_wrapper<const Event>>& events) {
         return combine_events(events);
       }
   };
 
-  // Process the combined histogram (tuple of StartingHistType and ThroughgoingHistType)
-  metaEvents_ = gollumfit::fastmode::get_fastmode_events<Event>(metaHist, meta_binner, combiner(), simHist_);
+  if (steeringParams_.fastMCIncludeInelasticity) {
+    // Process starting and throughgoing events separately to preserve inelasticity distribution
+    std::cout << "FastMC: Including reconstructed inelasticity in meta-binning for starting events" << std::endl;
 
-  std::cout << "Went from this many MC events " << mainSimulation_.size() << " to " << metaEvents_.size() << std::endl;
+    // 4D meta histogram for starting events: (primaryEnergy, primaryZenith, primaryType, reco inelasticity)
+    using StartingMetaHistType = histogram<4, entryStoringBin<std::reference_wrapper<const Event>>>;
+    // 3D meta histogram for throughgoing events: (primaryEnergy, primaryZenith, primaryType)
+    using ThroughgoingMetaHistType = histogram<3, entryStoringBin<std::reference_wrapper<const Event>>>;
+
+    StartingMetaHistType startingMetaHist(
+        LogarithmicAxis(steeringParams_.logEbinEdge, steeringParams_.logEbinWidth * meta_scaling),
+        LinearAxis(steeringParams_.cosThbinEdge, steeringParams_.cosThbinWidth * meta_scaling),
+        LinearAxis(0, 1),  // particle type
+        LinearAxis(steeringParams_.inelasticityBinEdge, steeringParams_.inelasticityBinWidth * meta_scaling)  // reco inelasticity
+    );
+
+    ThroughgoingMetaHistType throughgoingMetaHist(
+        LogarithmicAxis(steeringParams_.logEbinEdge, steeringParams_.logEbinWidth * meta_scaling),
+        LinearAxis(steeringParams_.cosThbinEdge, steeringParams_.cosThbinWidth * meta_scaling),
+        LinearAxis(0, 1)  // particle type
+    );
+
+    auto starting_meta_binner = [](StartingMetaHistType& h, const Event& e) {
+      if (e.topology == 0 && !std::isnan(e.inelasticity)) {  // Starting event with valid inelasticity
+        h.add(e.primaryEnergy, cos(e.primaryZenith), int(e.primaryType), e.inelasticity, amount(std::cref(e)));
+      }
+    };
+
+    auto throughgoing_meta_binner = [](ThroughgoingMetaHistType& h, const Event& e) {
+      if (e.topology == 1) {  // Throughgoing event
+        h.add(e.primaryEnergy, cos(e.primaryZenith), int(e.primaryType), amount(std::cref(e)));
+      }
+    };
+
+    // Process starting events
+    std::deque<Event> startingMetaEvents = gollumfit::fastmode::get_fastmode_events<Event>(
+        startingMetaHist, starting_meta_binner, combiner(), simHist_);
+
+    // Process throughgoing events
+    std::deque<Event> throughgoingMetaEvents = gollumfit::fastmode::get_fastmode_events<Event>(
+        throughgoingMetaHist, throughgoing_meta_binner, combiner(), simHist_);
+
+    // Combine meta events
+    metaEvents_ = std::move(startingMetaEvents);
+    metaEvents_.insert(metaEvents_.end(), throughgoingMetaEvents.begin(), throughgoingMetaEvents.end());
+
+    std::cout << "Went from this many MC events " << mainSimulation_.size() << " to " << metaEvents_.size()
+              << " (starting: " << startingMetaEvents.size() << ", throughgoing: " << throughgoingMetaEvents.size() << ")" << std::endl;
+
+  } else {
+    // Original behavior: bin all events together in true space only
+    using MetaHistType = histogram<3, entryStoringBin<std::reference_wrapper<const Event>>>;
+
+    MetaHistType metaHist(
+        LogarithmicAxis(steeringParams_.logEbinEdge, steeringParams_.logEbinWidth * meta_scaling),
+        LinearAxis(steeringParams_.cosThbinEdge, steeringParams_.cosThbinWidth * meta_scaling),
+        LinearAxis(0, 1));  // particle type
+
+    auto meta_binner = [](MetaHistType& h, const Event& e) {
+      h.add(e.primaryEnergy, cos(e.primaryZenith), int(e.primaryType), amount(std::cref(e)));
+    };
+
+    metaEvents_ = gollumfit::fastmode::get_fastmode_events<Event>(metaHist, meta_binner, combiner(), simHist_);
+
+    std::cout << "Went from this many MC events " << mainSimulation_.size() << " to " << metaEvents_.size() << std::endl;
+  }
+
   assert(!metaEvents_.empty());
 
   // Create new empty histograms for both starting and throughgoing events

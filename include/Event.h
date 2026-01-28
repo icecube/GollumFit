@@ -600,6 +600,9 @@ void readFile(const std::string& filePath,
     for(std::map<RecordID,Event>::value_type& item : intermediateData)
         action(item.first,item.second);
 
+    size_t map_size = intermediateData.size();
+    std::cout << "Intermediate data size = " << map_size << std::endl;
+
     intermediateData.clear();
 }
 

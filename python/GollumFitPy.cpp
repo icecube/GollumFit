@@ -194,6 +194,8 @@ PYBIND11_MODULE(GollumFitPy, m)
     // Histogram enable/disable toggles
     .def_readwrite("enableStartingHistogram",&GF::SteeringParams::enableStartingHistogram)
     .def_readwrite("enableThroughgoingHistogram",&GF::SteeringParams::enableThroughgoingHistogram)
+    // FastMC configuration
+    .def_readwrite("fastMCIncludeInelasticity",&GF::SteeringParams::fastMCIncludeInelasticity, "Include reco inelasticity in FastMC meta-binning for starting events")
   ;
 
 
