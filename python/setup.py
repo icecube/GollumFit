@@ -31,6 +31,7 @@ libraries = [
     "SQuIDS", "nuSQuIDS",
     "gsl", "gslcblas", "m", "z",
     "hdf5", "hdf5_hl", "PhysTools", "cfitsio", "GollumFit",
+    "diver",  # Diver DE optimizer
 ]
 
 architecture = os.uname().machine

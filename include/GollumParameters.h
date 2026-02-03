@@ -579,6 +579,13 @@ struct SteeringParams {
 
   bool enableTotalNorm = true;///< If true, convNorm is applied to all flux components
 
+  // Diver optimizer settings
+  int diver_maxgen = 100;      ///< maximum generations for Diver
+  int diver_NP = 200;          ///< population size for Diver
+  double diver_F = 0.6;        ///< mutation factor for Diver
+  double diver_Cr = 0.9;       ///< crossover rate for Diver
+  int diver_seed = 100;        ///< random seed for Diver
+
   /**
   * @brief Default constructor.
   */
