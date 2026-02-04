@@ -189,6 +189,7 @@ PYBIND11_MODULE(GollumFitPy, m)
     .def_readwrite("diver_F",&GF::SteeringParams::diver_F, "Mutation factor for Diver optimizer")
     .def_readwrite("diver_Cr",&GF::SteeringParams::diver_Cr, "Crossover rate for Diver optimizer")
     .def_readwrite("diver_seed",&GF::SteeringParams::diver_seed, "Random seed for Diver optimizer")
+    .def_readwrite("diver_free_indices",&GF::SteeringParams::diver_free_indices, "Parameter indices for Diver to optimize (empty = default 9)")
   ;
 
 

@@ -585,6 +585,7 @@ struct SteeringParams {
   double diver_F = 0.6;        ///< mutation factor for Diver
   double diver_Cr = 0.9;       ///< crossover rate for Diver
   int diver_seed = 100;        ///< random seed for Diver
+  std::vector<int> diver_free_indices = {};  ///< parameter indices for Diver to optimize (empty = use default 9)
 
   /**
   * @brief Default constructor.

@@ -38,8 +38,11 @@ static std::atomic<long long> n_good{0};  ///< Successful (finite) evaluations
 static std::atomic<long long> n_bad{0};   ///< Failed/invalid evaluations
 /// @}
 
+/// Current free indices for objective function (set by Dive before calling cdiver)
+static std::vector<int> current_free_indices;
+
 /**
- * @brief Returns indices of free parameters for Diver optimization.
+ * @brief Returns default indices of free parameters for Diver optimization.
  *
  * These 9 parameters are the most important for global basin-finding.
  * Other nuisance parameters are held fixed at their seeded values during
@@ -47,7 +50,7 @@ static std::atomic<long long> n_bad{0};   ///< Failed/invalid evaluations
  *
  * @return Reference to static vector of parameter indices
  */
-inline const std::vector<int>& free_indices() {
+inline const std::vector<int>& default_free_indices() {
     static const std::vector<int> idx = {
         0,   // convNorm
         8,   // hadronicVHE3kp
@@ -60,6 +63,19 @@ inline const std::vector<int>& free_indices() {
         34   // astroPivot
     };
     return idx;
+}
+
+/**
+ * @brief Get free indices to use - custom if provided, otherwise default.
+ *
+ * @param custom_indices Custom indices from SteeringParams (empty = use default)
+ * @return Vector of parameter indices to optimize
+ */
+inline std::vector<int> get_free_indices(const std::vector<int>& custom_indices) {
+    if (custom_indices.empty()) {
+        return default_free_indices();
+    }
+    return custom_indices;
 }
 
 /**
@@ -156,7 +172,7 @@ inline double objective(
     auto* gf_ptr = static_cast<std::shared_ptr<GollumFit>*>(context);
     std::shared_ptr<GollumFit> gf = *gf_ptr;
 
-    const auto& idx = free_indices();
+    const auto& idx = current_free_indices;
 
     FitParameters fp = gf->GetFitParametersSeed()[0];
     std::vector<double> full = gf->ConvertFitParameters(fp);
@@ -210,8 +226,14 @@ inline FitResult Dive(
     const double Cr_in = steer.diver_Cr;
     const int diver_seed = steer.diver_seed;
 
-    const auto& idx = free_indices();
+    // Get free indices (custom if provided, otherwise default 9)
+    const auto idx = get_free_indices(steer.diver_free_indices);
+    current_free_indices = idx;  // Set for objective function
     const int D = static_cast<int>(idx.size());
+
+    std::cout << "[DIVER] Using " << D << " free parameters: ";
+    for (int i : idx) std::cout << i << " ";
+    std::cout << std::endl;
 
     /* ---------- full bounds (must match FitParameters ordering) ---------- */
     std::vector<std::pair<double,double>> full_bounds = {
