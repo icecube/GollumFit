@@ -42,7 +42,7 @@ namespace gollumfit {
         {"BDT_Test_HE",MCSet(mc_dataPath,"BDT_19738",{true,1},992,1.27,-1,
                      LW::MakeGeneratorsFromLICFile(tools::CheckedFilePath(mc_dataPath + "/" + "Platinum_Generation_data.lic",true)))
         },
-        {"BDT_Split_HE",MCSet(mc_dataPath,"BDT_19738",{true,20},19738,1.27,-1,
+        {"BDT_Split_HE",MCSet(mc_dataPath,"BDT_19738",{true,5},19738,1.27,-1,
                      LW::MakeGeneratorsFromLICFile(tools::CheckedFilePath(mc_dataPath + "/" + "Platinum_Generation_data.lic",true)))
         },
         {"BDT_Tau",MCSet(mc_dataPath,"BDT_Tau.h5",{false,0},5000,1.27,-1,
