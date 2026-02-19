@@ -127,8 +127,8 @@ for sname in syst_dict.keys():
 gollumdir = "../../gollumfit-release"
 
 # Set correlations (required for fitting/minimization, not for likelihood evaluation)
-iceg_corr = np.load('../../resources/IceGradientsMaker/icegrad_correlations.npy')
-flux_corr = np.load('../../resources/DDMFluxMaker/flux_correlations_new_ddmnodeis.npy')
+iceg_corr = np.load('../../resources/correlation_matrices/icegrad_correlations.npy')
+flux_corr = np.load('../../resources/correlation_matrices/flux_correlations_new_ddmnodeis.npy')
 for idx, val in np.ndenumerate(iceg_corr):
     priors.SetIceGradientsCorr(idx[0], idx[1], val)
 for idx, val in np.ndenumerate(flux_corr):
