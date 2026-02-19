@@ -80,4 +80,8 @@ ext = Pybind11Extension(
     language="c++",
 )
 
-setup(ext_modules=[ext])
+setup(
+    name='GollumFitPy',
+    version='1.0.0',
+    ext_modules=[ext]
+)

@@ -469,6 +469,8 @@ PYBIND11_MODULE(GollumFitPy, m)
     .def("SetFitParametersFlag",&GF::GollumFit::SetFitParametersFlag)
     .def("SetFitParametersBound",&GF::GollumFit::SetFitParametersBound)
     .def("SetFitParametersPriors",&GF::GollumFit::SetFitParametersPriors)
+    .def("GetSteeringParams",&GF::GollumFit::GetSteeringParams)
+    .def("GetDataPaths",&GF::GollumFit::GetDataPaths)
   ;
 
   py::enum_<LW::ParticleType>(m, "ParticleType")
