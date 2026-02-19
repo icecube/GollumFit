@@ -658,7 +658,7 @@ hist_marray GollumFit::GetRealization(std::vector<double> fit_params, int seed) 
   }
 
   std::vector<Event> realization=phys_tools::likelihood::generateSample(weights,mainSimulation_,expected,rng);
-  auto fullRealizationHist = std::make_tuple(makeEmptyHistogramCopy(std::get<0>(dataHist_)));
+  auto fullRealizationHist = std::make_tuple(makeEmptyHistogramCopy(std::get<0>(simHist_)));
   bin(realization,fullRealizationHist,binner);
   auto& realizationHist = std::get<0>(fullRealizationHist);
 
