@@ -9,6 +9,23 @@ For details on the code, installation, usage, and examples, please visit the off
 
 To build and run GollumFit, follow the instructions in the [installation manual](https://docs.icecube.aq/gollumfit/main/md__home_runner_work_GollumFit_GollumFit_docs_manual_installation.html).
 
+### Diver
+
+This branch adds support for [Diver](https://github.com/diveropt/Diver), a differential evolution optimizer. Requires `gfortran` and MPI (`mpif90`). To install:
+
+```bash
+git clone https://github.com/diveropt/Diver.git
+cd Diver
+make libdiver.so
+```
+
+Then add Diver to your environment:
+```bash
+export DIVER_DIR=/path/to/Diver
+export LD_LIBRARY_PATH=$DIVER_DIR/lib:$LD_LIBRARY_PATH
+export CPLUS_INCLUDE_PATH=$DIVER_DIR/include:$CPLUS_INCLUDE_PATH
+```
+
 
 ## Folder Descriptions
 
