@@ -82,6 +82,6 @@ ext = Pybind11Extension(
 
 setup(
     name='GollumFitPy',
-    version='1.0.0',
+    version='1.2.0',
     ext_modules=[ext]
 )
