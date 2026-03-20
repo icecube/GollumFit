@@ -9,7 +9,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "GollumFitPy"
-version = "0.0.0"
+version = "1.2.0"
 description = "Python bindings for GollumFit (pybind11 extension)"
 readme = "README.md"
 requires-python = ">=3.8"
