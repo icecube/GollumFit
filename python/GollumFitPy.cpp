@@ -309,6 +309,7 @@ PYBIND11_MODULE(GollumFitPy, m)
   ;
 
   py::class_<GF::FitParametersFlag, std::shared_ptr<GF::FitParametersFlag> >(m, "FitParametersFlag")
+    .def(py::init<>())
     .def(py::init<bool>())
     .def_readwrite("convNorm",&GF::FitParametersFlag::convNorm)
     .def_readwrite("promptNorm",&GF::FitParametersFlag::promptNorm)
@@ -468,6 +469,8 @@ PYBIND11_MODULE(GollumFitPy, m)
     .def("SetFitParametersFlag",&GF::GollumFit::SetFitParametersFlag)
     .def("SetFitParametersBound",&GF::GollumFit::SetFitParametersBound)
     .def("SetFitParametersPriors",&GF::GollumFit::SetFitParametersPriors)
+    .def("GetSteeringParams",&GF::GollumFit::GetSteeringParams)
+    .def("GetDataPaths",&GF::GollumFit::GetDataPaths)
   ;
 
   py::enum_<LW::ParticleType>(m, "ParticleType")

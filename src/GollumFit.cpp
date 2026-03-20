@@ -81,7 +81,7 @@ void GollumFit::LoadMC(){
 
   double livetime=steeringParams_.fullLivetime;
 
-  std::vector<MCSet> simSetsToLoad = sterile::GetSimulationSets(steeringParams_.simToLoad, dataPaths_.mc_path+ "/STERILE");
+  std::vector<MCSet> simSetsToLoad = sterile::GetSimulationSets(steeringParams_.simToLoad, dataPaths_.mc_path);
 
   auto simAction=[&](RecordID id, Event& e, double number_of_files, const DOMEfficiencySetter<Event>& domEff, const HoleIceSetter<Event>& holeIce){
 
@@ -485,7 +485,7 @@ void GollumFit::ConstructFluxWeighter(){
 void GollumFit::ConstructMonteCarloGenerationWeighter(){
   mcw_.clear();
 
-  std::vector<MCSet> simSetsToLoad = sterile::GetSimulationSets(steeringParams_.simToLoad, dataPaths_.mc_path+ "/STERILE");
+  std::vector<MCSet> simSetsToLoad = sterile::GetSimulationSets(steeringParams_.simToLoad, dataPaths_.mc_path);
   for(auto simset: simSetsToLoad ){
     for(auto g : simset.generators){
       mcw_.emplace_back(g);
@@ -658,7 +658,7 @@ hist_marray GollumFit::GetRealization(std::vector<double> fit_params, int seed) 
   }
 
   std::vector<Event> realization=phys_tools::likelihood::generateSample(weights,mainSimulation_,expected,rng);
-  auto fullRealizationHist = std::make_tuple(makeEmptyHistogramCopy(std::get<0>(dataHist_)));
+  auto fullRealizationHist = std::make_tuple(makeEmptyHistogramCopy(std::get<0>(simHist_)));
   bin(realization,fullRealizationHist,binner);
   auto& realizationHist = std::get<0>(fullRealizationHist);
 
