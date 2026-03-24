@@ -1,6 +1,7 @@
 [build-system]
 requires = [
   "setuptools>=61",
+  "setuptools-scm>=7",
   "wheel",
   "pybind11>=2.10",
   "numpy",
@@ -9,7 +10,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "GollumFitPy"
-version = "1.2.0"
+dynamic = ["version"]
 description = "Python bindings for GollumFit (pybind11 extension)"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -23,3 +24,6 @@ classifiers = [
 
 [tool.setuptools]
 packages = []
+
+[tool.setuptools_scm]
+root = ".."
