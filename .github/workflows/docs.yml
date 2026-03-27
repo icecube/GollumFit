@@ -23,7 +23,7 @@ jobs:
         working-directory: ./docs/doxygen/
         run: |
           # Delete old docs first
-          curl -XDELETE -i https://docs.icecube.aq/api/delete?path=gollumfit/${{ github.ref_name }} -u icecube:${{ secrets.ICECUBE_PASSWORD }} || true
+          curl -XDELETE -i https://docs.icecube.aq/api/delete?path=gollumfit/${{ github.ref_name }} -u icecube:${{ secrets.DOCS_ICECUBE_AQ_PASSWORD }} || true
           # Upload new docs
           tar -czvf gollumfit_docs.tar.gz -Chtml .
-          curl -XPUT -i --data-binary @gollumfit_docs.tar.gz https://docs.icecube.aq/api/upload?path=gollumfit/${{ github.ref_name }} -u icecube:${{ secrets.ICECUBE_PASSWORD }}
+          curl -XPUT -i --data-binary @gollumfit_docs.tar.gz https://docs.icecube.aq/api/upload?path=gollumfit/${{ github.ref_name }} -u icecube:${{ secrets.DOCS_ICECUBE_AQ_PASSWORD }}
