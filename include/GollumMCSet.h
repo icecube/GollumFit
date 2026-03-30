@@ -24,29 +24,37 @@ namespace gollumfit {
 struct MCSet {
 
   /// Path to the directory containing simulation files.
-	const std::string path;
+	std::string path;
 
   /// Name of the file to be used in the simulation.
-  const std::string filename;
+  std::string filename;
+
+  /// Optional list of filenames. When non-empty, these are loaded instead of filename/split.
+  std::vector<std::string> filenames;
 
   /**
    * A pair indicating whether the simulation should be split and, if so, the number of parts to split into.
    * The boolean value indicates the presence of splitting (true for split, false for no split), while the
    * unsigned int represents the number of splits.
   */
-  const std::pair<bool, unsigned int> split;
+  std::pair<bool, unsigned int> split;
 
   /// The total number of files to be considered in the simulation.
-  const double number_of_files;
+  double number_of_files;
 
   /// The fraction of unshadowed area, also known as dom efficiency.
-  const double unshadowedFraction ;// aka domefficiency
+  double unshadowedFraction ;// aka domefficiency
 
   /// Forward scattering parameter for hole ice, also known as p2.
-  const double holeiceForward;// aka p2
+  double holeiceForward;// aka p2
 
   /// List of generator pointers used for the simulation.
   std::vector<std::shared_ptr<LW::Generator>> generators;
+
+  /**
+  * @brief Default constructor.
+  */
+  MCSet() = default;
 
   /**
   * @brief Construct a new MCSet object with specified parameters.
@@ -61,29 +69,38 @@ struct MCSet {
   */
 	MCSet(const std::string& p,const std::string& filename, const std::pair<bool, unsigned int> split, double number_of_files, double unshadowedFraction, double holeiceForward, std::vector<std::shared_ptr<LW::Generator>> g):
 	path(p),filename(filename),split(split),number_of_files(number_of_files),unshadowedFraction(unshadowedFraction),holeiceForward(holeiceForward),generators(g){}
-  
+
+	MCSet(const std::string& p, const std::vector<std::string>& filenames, double number_of_files, double unshadowedFraction, double holeiceForward, std::vector<std::shared_ptr<LW::Generator>> g):
+	path(p),filenames(filenames),split({false,0}),number_of_files(number_of_files),unshadowedFraction(unshadowedFraction),holeiceForward(holeiceForward),generators(g){}
+
   /**
   * @brief Copy constructor for MCSet object.
   *
   * @param other The MCSet object to copy from.
   */
 	MCSet(MCSet& other):path(other.path),
-  filename(other.filename),split(other.split),number_of_files(other.number_of_files),
+  filename(other.filename),filenames(other.filenames),split(other.split),number_of_files(other.number_of_files),
   unshadowedFraction(other.unshadowedFraction),holeiceForward(other.holeiceForward),generators(other.generators){}
-  
+
   // copy constructor
 	MCSet(const MCSet& other):path(other.path),
-  filename(other.filename),split(other.split),number_of_files(other.number_of_files),
+  filename(other.filename),filenames(other.filenames),split(other.split),number_of_files(other.number_of_files),
   unshadowedFraction(other.unshadowedFraction),holeiceForward(other.holeiceForward),generators(other.generators){}
-  
+
   /**
   * @brief Move constructor for MCSet object.
   *
   * @param other The MCSet object to move from.
   */
 	MCSet(MCSet&& other):path(std::move(other.path)),
-  filename(std::move(other.filename)),split(std::move(other.split)),number_of_files(std::move(other.number_of_files)),
+  filename(std::move(other.filename)),filenames(std::move(other.filenames)),split(std::move(other.split)),number_of_files(std::move(other.number_of_files)),
   unshadowedFraction(std::move(other.unshadowedFraction)),holeiceForward(std::move(other.holeiceForward)),generators(std::move(other.generators)){}
+
+  /// Copy assignment operator.
+  MCSet& operator=(const MCSet& other) = default;
+
+  /// Move assignment operator.
+  MCSet& operator=(MCSet&& other) = default;
 };
 
 } // close gollumfit namespace

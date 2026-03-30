@@ -229,7 +229,13 @@ void GollumFit::LoadMC(){
     auto callback=[&](RecordID id, Event& e){ simAction(id,e,simSet.number_of_files,*domEffSetter_,*holeIceSetter_); };
     
     std::cout << "Number of MC sets and splits: " << std::get<0>(simSet.split) << " " << std::get<1>(simSet.split) << std::endl;
-    if(std::get<0>(simSet.split)){
+    if(!simSet.filenames.empty()){
+      for(const auto& fname : simSet.filenames){
+        auto path=CheckedFilePath(simSet.path+"/"+fname);
+        H5Load::sterile::readFile(path,steeringParams_,steeringParams_.selectionStart,callback);
+      }
+    }
+    else if(std::get<0>(simSet.split)){
       for(unsigned int split = 0; split < std::get<1>(simSet.split); split++){
         auto path=CheckedFilePath(simSet.path+"/"+simSet.filename+"/"+simSet.filename+"_"+std::to_string(split)+".h5");
         H5Load::sterile::readFile(path,steeringParams_,steeringParams_.selectionStart,callback);
@@ -237,7 +243,7 @@ void GollumFit::LoadMC(){
     }
     else {
       auto path=CheckedFilePath(simSet.path+"/"+simSet.filename);
-      H5Load::sterile::readFile(path,steeringParams_,steeringParams_.selectionStart,callback);      
+      H5Load::sterile::readFile(path,steeringParams_,steeringParams_.selectionStart,callback);
     }
   }
 
@@ -1138,11 +1144,22 @@ void GollumFit::ConstructLikelihoodProblem(){
 
   auto fitseedvec = ConvertFitParameters(fitSeed_.front());
 
-  prob_ = std::make_shared<LType>(phys_tools::likelihood::makeLikelihoodProblem<std::reference_wrapper<const Event>,38>(
-                                  dataHist_, {simHist_}, llhpriors, {0.0}, simpleLocalDataWeighterConstructor(), DFWM,
-                                  phys_tools::likelihood::SAYLikelihoodRelativeUncertaintyMod(0), fitseedvec));
-  prob_->setEvaluationThreadCount(steeringParams_.evalThreads);
-  prob_->likelihoodFunction.SetSigmaOverMu(steeringParams_.uncertaintyModSigmaOverMu);
+  if (steeringParams_.likelihoodType == LikelihoodType::Poisson) {
+    std::cout << "Using Poisson likelihood (no MC stats correction)" << std::endl;
+    auto prob = std::make_shared<LTypePoisson>(phys_tools::likelihood::makeLikelihoodProblem<std::reference_wrapper<const Event>,38>(
+                                    dataHist_, {simHist_}, llhpriors, {0.0}, simpleLocalDataWeighterConstructor(), DFWM,
+                                    phys_tools::likelihood::poissonLikelihood(), fitseedvec));
+    prob->setEvaluationThreadCount(steeringParams_.evalThreads);
+    prob_ = prob;
+  } else {
+    std::cout << "Using SAY likelihood (with MC stats correction)" << std::endl;
+    auto prob = std::make_shared<LTypeSAY>(phys_tools::likelihood::makeLikelihoodProblem<std::reference_wrapper<const Event>,38>(
+                                    dataHist_, {simHist_}, llhpriors, {0.0}, simpleLocalDataWeighterConstructor(), DFWM,
+                                    phys_tools::likelihood::SAYLikelihoodRelativeUncertaintyMod(0), fitseedvec));
+    prob->setEvaluationThreadCount(steeringParams_.evalThreads);
+    prob->likelihoodFunction.SetSigmaOverMu(steeringParams_.uncertaintyModSigmaOverMu);
+    prob_ = prob;
+  }
 
   likelihood_problem_constructed_=true;
 }
@@ -1151,7 +1168,9 @@ void GollumFit::ConstructLikelihoodProblem(){
 double GollumFit::EvalLLH(std::vector<double> nuisance, bool include_prior) const {
   if(not likelihood_problem_constructed_)
     throw std::runtime_error("Likelihood problem has not been constructed..");
-  return -prob_->evaluateLikelihood(nuisance,include_prior);
+  return std::visit([&](auto& prob) {
+    return -prob->evaluateLikelihood(nuisance, include_prior);
+  }, prob_);
 }
 
 double GollumFit::EvalLLH(FitParameters nuisance, bool include_prior) const {
@@ -1159,7 +1178,9 @@ double GollumFit::EvalLLH(FitParameters nuisance, bool include_prior) const {
 }
 
 phys_tools::autodiff::FD<38> GollumFit::EvalLLHGradient(std::vector<phys_tools::autodiff::FD<38>> v) const {
-  return -prob_->evaluateLikelihood(v);
+  return std::visit([&](auto& prob) {
+    return -prob->evaluateLikelihood(v);
+  }, prob_);
 }
 
 void GollumFit::ForceFitSeedSanity(){
@@ -1182,7 +1203,6 @@ void GollumFit::ForceFitSeedSanity(FitParameters& fitSeed) {
 
 }
 
-// make a copy of this function to ML-augment
 FitResult GollumFit::MinLLH() const {
   if(not likelihood_problem_constructed_)
     throw std::runtime_error("Likelihood problem has not been constructed..");
@@ -1192,7 +1212,7 @@ FitResult GollumFit::MinLLH() const {
 
   for(auto fitSeed : fitSeed_){
     std::vector<double> seed=ConvertFitParameters(fitSeed);
-    prob_->setSeed(seed);
+    std::visit([&](auto& prob) { prob->setSeed(seed); }, prob_);
 
     std::vector<unsigned int> fixedIndices;
     std::vector<bool> FixVec=ConvertFitParametersFlag(fixedParams_);
@@ -1204,44 +1224,45 @@ FitResult GollumFit::MinLLH() const {
     minimizer.setChangeTolerance(steeringParams_.change_tol);
 
     // parameter seed, gradient factor, min boundary, max boundary
-    minimizer.addParameter(  seed[0], .001, boundParams_.convNormMin,                  boundParams_.convNormMax                  ); // conv norm
-    minimizer.addParameter(  seed[1], .001, boundParams_.promptNormMin,                boundParams_.promptNormMax                ); // prompt norm
-    minimizer.addParameter(  seed[2], .001, boundParams_.zenithCorrectionMin,          boundParams_.zenithCorrectionMax          ); // jordi delta
-    minimizer.addParameter(  seed[3], .001, boundParams_.kaonLossesMin,                boundParams_.kaonLossesMax                ); // kaon losses
-    minimizer.addParameter(  seed[4], .001, boundParams_.hadronicHEkpMin,              boundParams_.hadronicHEkpMax              ); // hadronic HE K plus
-    minimizer.addParameter(  seed[5], .001, boundParams_.hadronicHEkmMin,              boundParams_.hadronicHEkmMax              ); // hadronic HE K minus
-    minimizer.addParameter(  seed[6], .001, boundParams_.hadronicVHE1pipMin,           boundParams_.hadronicVHE1pipMax           ); // hadronic VHE1 pi plus
-    minimizer.addParameter(  seed[7], .001, boundParams_.hadronicVHE1pimMin,           boundParams_.hadronicVHE1pimMax           ); // hadronic VHE1 pi minus
-    minimizer.addParameter(  seed[8], .001, boundParams_.hadronicVHE3kpMin,            boundParams_.hadronicVHE3kpMax            ); // hadronic VHE3 K plus
-    minimizer.addParameter(  seed[9], .001, boundParams_.hadronicVHE3kmMin,            boundParams_.hadronicVHE3kmMax            ); // hadronic VHE3 K minus
-    minimizer.addParameter( seed[10], .001, boundParams_.hadronicVHE3pipMin,           boundParams_.hadronicVHE3pipMax           ); // hadronic VHE3 pi plus
-    minimizer.addParameter( seed[11], .001, boundParams_.hadronicVHE3pimMin,           boundParams_.hadronicVHE3pimMax           ); // hadronic VHE3 pi minus
-    minimizer.addParameter( seed[12], .001, boundParams_.hadronicVHE3pMin,             boundParams_.hadronicVHE3pMax             ); // hadronic VHE3 proton
-    minimizer.addParameter( seed[13], .001, boundParams_.hadronicVHE3nMin,             boundParams_.hadronicVHE3nMax             ); // hadronic VHE3 neutron
-    minimizer.addParameter( seed[14], .001, boundParams_.cosmicRay1Min,                boundParams_.cosmicRay1Max                ); // cosmic ray PCA1
-    minimizer.addParameter( seed[15], .001, boundParams_.cosmicRay2Min,                boundParams_.cosmicRay2Max                ); // cosmic ray PCA2
-    minimizer.addParameter( seed[16], .001, boundParams_.cosmicRay3Min,                boundParams_.cosmicRay3Max                ); // cosmic ray PCA3
-    minimizer.addParameter( seed[17], .001, boundParams_.cosmicRay4Min,                boundParams_.cosmicRay4Max                ); // cosmic ray PCA4
-    minimizer.addParameter( seed[18], .001, boundParams_.cosmicRay5Min,                boundParams_.cosmicRay5Max                ); // cosmic ray PCA5
-    minimizer.addParameter( seed[19], .001, boundParams_.cosmicRay6Min,                boundParams_.cosmicRay6Max                ); // cosmic ray PCA6
-    minimizer.addParameter( seed[20], .001, boundParams_.icegrad0Min,                  boundParams_.icegrad0Max                  ); // ice grad 0
-    minimizer.addParameter( seed[21], .001, boundParams_.icegrad1Min,                  boundParams_.icegrad1Max                  ); // ice grad 1
-    minimizer.addParameter( seed[22], .001, boundParams_.icegrad2Min,                  boundParams_.icegrad2Max                  ); // ice grad 2
-    minimizer.addParameter( seed[23], .001, boundParams_.icegrad3Min,                  boundParams_.icegrad3Max                  ); // ice grad 3
-    minimizer.addParameter( seed[24], .001, boundParams_.icegrad4Min,                  boundParams_.icegrad4Max                  ); // ice grad 4
-    minimizer.addParameter( seed[25], .001, boundParams_.icegrad5Min,                  boundParams_.icegrad5Max                  ); // ice grad 5
-    minimizer.addParameter( seed[26], .001, boundParams_.icegrad6Min,                  boundParams_.icegrad6Max                  ); // ice grad 6
-    minimizer.addParameter( seed[27], .001, boundParams_.icegrad7Min,                  boundParams_.icegrad7Max                  ); // ice grad 7
-    minimizer.addParameter( seed[28], .001, boundParams_.icegrad8Min,                  boundParams_.icegrad8Max                  ); // ice grad 8
-    minimizer.addParameter( seed[29], .001, boundParams_.domEfficiencyMin,             boundParams_.domEfficiencyMax             ); // dom eff
-    minimizer.addParameter( seed[30], .001, boundParams_.holeiceForwardMin,            boundParams_.holeiceForwardMax            ); // hole ice forward
-    minimizer.addParameter( seed[31], .001, boundParams_.astroNormMin,                 boundParams_.astroNormMax                 ); // astro norm
-    minimizer.addParameter( seed[32], .001, boundParams_.astroDeltaGammaMin,           boundParams_.astroDeltaGammaMax           ); // astro delta gamma
-    minimizer.addParameter( seed[33], .001, boundParams_.astroDeltaGammaSecMin,        boundParams_.astroDeltaGammaSecMax        ); // second astro component parameters
-    minimizer.addParameter( seed[34], .001, boundParams_.astroPivotMin,                boundParams_.astroPivotMax                ); // pivot point astro component 
-    minimizer.addParameter( seed[35], .001, boundParams_.NeutrinoAntineutrinoRatioMin, boundParams_.NeutrinoAntineutrinoRatioMax ); // conv particle balance
-    minimizer.addParameter( seed[36], .001, boundParams_.nuxsMin,                      boundParams_.nuxsMax                      ); // nuxs
-    minimizer.addParameter( seed[37], .001, boundParams_.nubarxsMin,                   boundParams_.nubarxsMax                   ); // nubarxs
+    double grad_factor = steeringParams_.grad_factor; 
+    minimizer.addParameter(  seed[0], grad_factor, boundParams_.convNormMin,                  boundParams_.convNormMax                  ); // conv norm
+    minimizer.addParameter(  seed[1], grad_factor, boundParams_.promptNormMin,                boundParams_.promptNormMax                ); // prompt norm
+    minimizer.addParameter(  seed[2], grad_factor, boundParams_.zenithCorrectionMin,          boundParams_.zenithCorrectionMax          ); // jordi delta
+    minimizer.addParameter(  seed[3], grad_factor, boundParams_.kaonLossesMin,                boundParams_.kaonLossesMax                ); // kaon losses
+    minimizer.addParameter(  seed[4], grad_factor, boundParams_.hadronicHEkpMin,              boundParams_.hadronicHEkpMax              ); // hadronic HE K plus
+    minimizer.addParameter(  seed[5], grad_factor, boundParams_.hadronicHEkmMin,              boundParams_.hadronicHEkmMax              ); // hadronic HE K minus
+    minimizer.addParameter(  seed[6], grad_factor, boundParams_.hadronicVHE1pipMin,           boundParams_.hadronicVHE1pipMax           ); // hadronic VHE1 pi plus
+    minimizer.addParameter(  seed[7], grad_factor, boundParams_.hadronicVHE1pimMin,           boundParams_.hadronicVHE1pimMax           ); // hadronic VHE1 pi minus
+    minimizer.addParameter(  seed[8], grad_factor, boundParams_.hadronicVHE3kpMin,            boundParams_.hadronicVHE3kpMax            ); // hadronic VHE3 K plus
+    minimizer.addParameter(  seed[9], grad_factor, boundParams_.hadronicVHE3kmMin,            boundParams_.hadronicVHE3kmMax            ); // hadronic VHE3 K minus
+    minimizer.addParameter( seed[10], grad_factor, boundParams_.hadronicVHE3pipMin,           boundParams_.hadronicVHE3pipMax           ); // hadronic VHE3 pi plus
+    minimizer.addParameter( seed[11], grad_factor, boundParams_.hadronicVHE3pimMin,           boundParams_.hadronicVHE3pimMax           ); // hadronic VHE3 pi minus
+    minimizer.addParameter( seed[12], grad_factor, boundParams_.hadronicVHE3pMin,             boundParams_.hadronicVHE3pMax             ); // hadronic VHE3 proton
+    minimizer.addParameter( seed[13], grad_factor, boundParams_.hadronicVHE3nMin,             boundParams_.hadronicVHE3nMax             ); // hadronic VHE3 neutron
+    minimizer.addParameter( seed[14], grad_factor, boundParams_.cosmicRay1Min,                boundParams_.cosmicRay1Max                ); // cosmic ray PCA1
+    minimizer.addParameter( seed[15], grad_factor, boundParams_.cosmicRay2Min,                boundParams_.cosmicRay2Max                ); // cosmic ray PCA2
+    minimizer.addParameter( seed[16], grad_factor, boundParams_.cosmicRay3Min,                boundParams_.cosmicRay3Max                ); // cosmic ray PCA3
+    minimizer.addParameter( seed[17], grad_factor, boundParams_.cosmicRay4Min,                boundParams_.cosmicRay4Max                ); // cosmic ray PCA4
+    minimizer.addParameter( seed[18], grad_factor, boundParams_.cosmicRay5Min,                boundParams_.cosmicRay5Max                ); // cosmic ray PCA5
+    minimizer.addParameter( seed[19], grad_factor, boundParams_.cosmicRay6Min,                boundParams_.cosmicRay6Max                ); // cosmic ray PCA6
+    minimizer.addParameter( seed[20], grad_factor, boundParams_.icegrad0Min,                  boundParams_.icegrad0Max                  ); // ice grad 0
+    minimizer.addParameter( seed[21], grad_factor, boundParams_.icegrad1Min,                  boundParams_.icegrad1Max                  ); // ice grad 1
+    minimizer.addParameter( seed[22], grad_factor, boundParams_.icegrad2Min,                  boundParams_.icegrad2Max                  ); // ice grad 2
+    minimizer.addParameter( seed[23], grad_factor, boundParams_.icegrad3Min,                  boundParams_.icegrad3Max                  ); // ice grad 3
+    minimizer.addParameter( seed[24], grad_factor, boundParams_.icegrad4Min,                  boundParams_.icegrad4Max                  ); // ice grad 4
+    minimizer.addParameter( seed[25], grad_factor, boundParams_.icegrad5Min,                  boundParams_.icegrad5Max                  ); // ice grad 5
+    minimizer.addParameter( seed[26], grad_factor, boundParams_.icegrad6Min,                  boundParams_.icegrad6Max                  ); // ice grad 6
+    minimizer.addParameter( seed[27], grad_factor, boundParams_.icegrad7Min,                  boundParams_.icegrad7Max                  ); // ice grad 7
+    minimizer.addParameter( seed[28], grad_factor, boundParams_.icegrad8Min,                  boundParams_.icegrad8Max                  ); // ice grad 8
+    minimizer.addParameter( seed[29], grad_factor, boundParams_.domEfficiencyMin,             boundParams_.domEfficiencyMax             ); // dom eff
+    minimizer.addParameter( seed[30], grad_factor, boundParams_.holeiceForwardMin,            boundParams_.holeiceForwardMax            ); // hole ice forward
+    minimizer.addParameter( seed[31], grad_factor, boundParams_.astroNormMin,                 boundParams_.astroNormMax                 ); // astro norm
+    minimizer.addParameter( seed[32], grad_factor, boundParams_.astroDeltaGammaMin,           boundParams_.astroDeltaGammaMax           ); // astro delta gamma
+    minimizer.addParameter( seed[33], grad_factor, boundParams_.astroDeltaGammaSecMin,        boundParams_.astroDeltaGammaSecMax        ); // second astro component parameters
+    minimizer.addParameter( seed[34], grad_factor, boundParams_.astroPivotMin,                boundParams_.astroPivotMax                ); // pivot point astro component 
+    minimizer.addParameter( seed[35], grad_factor, boundParams_.NeutrinoAntineutrinoRatioMin, boundParams_.NeutrinoAntineutrinoRatioMax ); // neutrino/antineutrino ratio
+    minimizer.addParameter( seed[36], grad_factor, boundParams_.nuxsMin,                      boundParams_.nuxsMax                      ); // nuxs
+    minimizer.addParameter( seed[37], grad_factor, boundParams_.nubarxsMin,                   boundParams_.nubarxsMax                   ); // nubarxs
 
     minimizer.setHistorySize(20);
 
@@ -1249,8 +1270,28 @@ FitResult GollumFit::MinLLH() const {
       minimizer.fixParameter(idx);
     }
 
+    // Debug: print autodiff gradient at seed for parameter 35 (NeutrinoAntineutrinoRatio)
+    {
+      using FDType = phys_tools::autodiff::FD<38>;
+      std::vector<FDType> fd_seed(38);
+      for (size_t i = 0; i < 38; ++i) {
+        fd_seed[i] = FDType(seed[i], i);
+      }
+      FDType llh_fd = std::visit([&](auto& prob) {
+        return -prob->evaluateLikelihood(fd_seed, false);
+      }, prob_);
+      std::cout << "Autodiff gradient at seed:" << std::endl;
+      std::cout << "  LLH value: " << llh_fd.value() << std::endl;
+      std::cout << "  Gradient[35] (NeutrinoAntineutrinoRatio): " << llh_fd.derivative(35) << std::endl;
+      // Print a few other gradients for comparison
+      std::cout << "  Gradient[31] (astroNorm): " << llh_fd.derivative(31) << std::endl;
+      std::cout << "  Gradient[1] (promptNorm): " << llh_fd.derivative(1) << std::endl;
+    }
+
     FitResult result;
-    result.succeeded=DoFitLBFGSB(*prob_, minimizer);
+    result.succeeded = std::visit([&](auto& prob) {
+      return DoFitLBFGSB(*prob, minimizer);
+    }, prob_);
     result.likelihood=minimizer.minimumValue();
     
     // printing out LH here! 
@@ -1333,11 +1374,13 @@ void GollumFit::ConstructFastMode(double meta_scaling) {
         throughgoingMetaHist, throughgoing_meta_binner, combiner(), simHist_);
 
     // Combine meta events
+    size_t nStartingMetaEvents = startingMetaEvents.size();
+    size_t nThroughgoingMetaEvents = throughgoingMetaEvents.size();
     metaEvents_ = std::move(startingMetaEvents);
     metaEvents_.insert(metaEvents_.end(), throughgoingMetaEvents.begin(), throughgoingMetaEvents.end());
 
     std::cout << "Went from this many MC events " << mainSimulation_.size() << " to " << metaEvents_.size()
-              << " (starting: " << startingMetaEvents.size() << ", throughgoing: " << throughgoingMetaEvents.size() << ")" << std::endl;
+              << " (starting: " << nStartingMetaEvents << ", throughgoing: " << nThroughgoingMetaEvents << ")" << std::endl;
 
   } else {
     // Original behavior: bin all events together in true space only

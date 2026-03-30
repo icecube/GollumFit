@@ -6,6 +6,7 @@
 
 #include <functional>
 #include "GollumFit.h"
+#include "GollumMCSpecifications.h"
 
 #include <numpy/ndarrayobject.h>
 #include <numpy/ndarraytypes.h>
@@ -118,6 +119,12 @@ PYBIND11_MODULE(GollumFitPy, m)
     .export_values()
   ;
 
+  py::enum_<GF::LikelihoodType>(m, "LikelihoodType")
+    .value("SAY", GF::LikelihoodType::SAY, "SAY likelihood with MC statistical uncertainty correction (default)")
+    .value("Poisson", GF::LikelihoodType::Poisson, "Simple Poisson likelihood without MC stats correction")
+    .export_values()
+  ;
+
   py::class_<GF::FitResult, std::shared_ptr<GF::FitResult> >(m, "FitResult")
     .def(py::init<>())
     .def_readwrite("params",&GF::FitResult::params)
@@ -173,6 +180,7 @@ PYBIND11_MODULE(GollumFitPy, m)
     .def_readwrite("active_hadronic_parameters",&GF::SteeringParams::active_hadronic_parameters)
     .def_readwrite("active_cosmicray_parameters",&GF::SteeringParams::active_cosmicray_parameters)
     .def_readwrite("uncertaintyModSigmaOverMu",&GF::SteeringParams::uncertaintyModSigmaOverMu, "Adds a relative error to the effective likelihood, where the input parameter is the relative error. The relative error is the same for all the bins.")
+    .def_readwrite("likelihoodType",&GF::SteeringParams::likelihoodType, "Likelihood function type: SAY (default, includes MC stats) or Poisson (no MC stats correction)")
     .def_readwrite("model_label",&GF::SteeringParams::model_label)
     .def_readwrite("simToLoad",&GF::SteeringParams::simToLoad)
     .def_readwrite("evalThreads",&GF::SteeringParams::evalThreads)
@@ -180,6 +188,7 @@ PYBIND11_MODULE(GollumFitPy, m)
     .def_readwrite("fullLivetime",&GF::SteeringParams::fullLivetime)
     .def_readwrite("change_tol",&GF::SteeringParams::change_tol)
     .def_readwrite("grad_tol",&GF::SteeringParams::grad_tol)
+    .def_readwrite("grad_factor",&GF::SteeringParams::grad_factor)
     .def_readwrite("selectionStart",&GF::SteeringParams::selectionStart)
     .def_readwrite("enableTotalNorm",&GF::SteeringParams::enableTotalNorm)
     // Inelasticity binning configuration
@@ -322,6 +331,7 @@ PYBIND11_MODULE(GollumFitPy, m)
   ;
 
   py::class_<GF::FitParametersFlag, std::shared_ptr<GF::FitParametersFlag> >(m, "FitParametersFlag")
+    .def(py::init<>())
     .def(py::init<bool>())
     .def_readwrite("convNorm",&GF::FitParametersFlag::convNorm)
     .def_readwrite("promptNorm",&GF::FitParametersFlag::promptNorm)
@@ -529,6 +539,55 @@ PYBIND11_MODULE(GollumFitPy, m)
     .def_readonly("energy",&Event::energy)
     .def_readonly("zenith",&Event::zenith)
     .def_readonly("inelasticity",&Event::inelasticity)
+  ;
+
+  // ---- MCSet and MCSetRegistry bindings ----
+
+  // Opaque binding for LW::Generator (users don't construct these directly)
+  py::class_<LW::Generator, std::shared_ptr<LW::Generator>>(m, "Generator");
+
+  m.def("MakeGeneratorsFromLICFile", [](const std::string& path) {
+    return LW::MakeGeneratorsFromLICFile(path);
+  }, "Create LW Generator objects from a .lic file",
+  py::arg("path"));
+
+  py::class_<GF::MCSet>(m, "MCSet")
+    .def(py::init<const std::string&, const std::string&, std::pair<bool, unsigned int>,
+                   double, double, double, std::vector<std::shared_ptr<LW::Generator>>>(),
+         py::arg("path"), py::arg("filename"), py::arg("split"),
+         py::arg("number_of_files"), py::arg("unshadowedFraction"),
+         py::arg("holeiceForward"), py::arg("generators"))
+    .def(py::init<const std::string&, const std::vector<std::string>&,
+                   double, double, double, std::vector<std::shared_ptr<LW::Generator>>>(),
+         py::arg("path"), py::arg("filenames"),
+         py::arg("number_of_files"), py::arg("unshadowedFraction"),
+         py::arg("holeiceForward"), py::arg("generators"))
+    .def(py::init<>())
+    .def_readwrite("path", &GF::MCSet::path)
+    .def_readwrite("filename", &GF::MCSet::filename)
+    .def_readwrite("filenames", &GF::MCSet::filenames)
+    .def_readwrite("split", &GF::MCSet::split)
+    .def_readwrite("number_of_files", &GF::MCSet::number_of_files)
+    .def_readwrite("unshadowedFraction", &GF::MCSet::unshadowedFraction)
+    .def_readwrite("holeiceForward", &GF::MCSet::holeiceForward)
+  ;
+
+  py::class_<GF::sterile::MCSetRegistry>(m, "MCSetRegistry")
+    .def_static("Instance", &GF::sterile::MCSetRegistry::Instance,
+                py::return_value_policy::reference,
+                "Get the singleton MCSetRegistry instance")
+    .def("RegisterMCSet", &GF::sterile::MCSetRegistry::RegisterMCSet,
+         "Register a single MCSet with a unique name",
+         py::arg("name"), py::arg("mcset"))
+    .def("RegisterSimulationTag", &GF::sterile::MCSetRegistry::RegisterSimulationTag,
+         "Register a compound tag that resolves to multiple MCSet names",
+         py::arg("tag"), py::arg("mcset_names"))
+    .def("InitDefaults", &GF::sterile::MCSetRegistry::InitDefaults,
+         "Initialize hardcoded default MC sets from the given path",
+         py::arg("mc_dataPath"))
+    .def("DefaultsInitialized", &GF::sterile::MCSetRegistry::DefaultsInitialized)
+    .def("ClearAll", &GF::sterile::MCSetRegistry::ClearAll,
+         "Clear all registered sets and tags")
   ;
 
   // to_python_converter< nsq::marray<double,1> , marray_to_numpy<1> >();

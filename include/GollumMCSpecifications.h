@@ -10,123 +10,177 @@
 
 /**
 * @file GollumMCSpecifications.h
-* @brief Functions to get MC simulation sets
+* @brief Functions to get MC simulation sets, with runtime registration support.
 */
 
 namespace gollumfit {
   namespace sterile {
 
     /**
-    * @brief Constructs a map of simulation identifiers to MCSet objects.
-    * 
-    * This function reads simulation configuration and data from specified files 
-    * and constructs MCSet objects with corresponding parameters. The function
-    * expects the presence of .lic and .h5 files in the provided mc_dataPath
-    * directory. These files are used to initialize the MCSet objects which are
-    * then mapped to their respective string identifiers.
-    * 
-    * @param mc_dataPath The path to the directory containing the .lic and .h5 
-    * files necessary for initializing MCSet objects.
-    * @return std::map<std::string, MCSet> A map linking simulation set 
-    * identifiers to their corresponding MCSet objects.
-    * @throw std::runtime_error Throws if the file paths are invalid or required 
-    * files are missing.
+    * @brief Singleton registry for MC simulation sets.
+    *
+    * Holds both individual MCSet entries and compound simulation tags.
+    * Hardcoded defaults are loaded lazily via InitDefaults(). Custom sets
+    * can be registered from C++ or Python before constructing GollumFit.
     */
-    std::map<std::string,MCSet> GetSimInfo(std::string mc_dataPath)
+    class MCSetRegistry {
+    public:
+      /// Get the singleton instance.
+      inline static MCSetRegistry& Instance() {
+        static MCSetRegistry instance;
+        return instance;
+      }
+
+      /// Register a single MCSet with a unique name.
+      void RegisterMCSet(const std::string& name, MCSet mcset) {
+        simInfo_.insert_or_assign(name, std::move(mcset));
+      }
+
+      /// Register a compound simulation tag that resolves to multiple MCSet names.
+      void RegisterSimulationTag(const std::string& tag, const std::vector<std::string>& mcset_names) {
+        compoundTags_[tag] = mcset_names;
+      }
+
+      /// Get the full simulation info map.
+      const std::map<std::string, MCSet>& GetSimInfo() const {
+        return simInfo_;
+      }
+
+      /// Check if defaults have been initialized.
+      bool DefaultsInitialized() const { return defaults_initialized_; }
+
+      /// Clear all registered sets (both defaults and custom).
+      void ClearAll() {
+        simInfo_.clear();
+        compoundTags_.clear();
+        defaults_initialized_ = false;
+      }
+
+      /**
+      * @brief Initialize the hardcoded default MC sets.
+      *
+      * @param mc_dataPath Path to the STERILE MC directory.
+      */
+      void InitDefaults(const std::string& mc_dataPath) {
+        if (defaults_initialized_) return;
+
+        // Individual MC sets
+        RegisterMCSet("Cheetah_Test", MCSet(mc_dataPath,"Cheetah_Test_1.h5",{false,0},1,1.27,-1,
+                     LW::MakeGeneratorsFromLICFile(tools::CheckedFilePath(mc_dataPath + "/" + "Cheetah_Generation_data.lic",true))));
+
+        RegisterMCSet("Cheetah_Mini", MCSet(mc_dataPath,"Cheetah_2997.h5",{false,0},2997,1.27,-1,
+                     LW::MakeGeneratorsFromLICFile(tools::CheckedFilePath(mc_dataPath + "/" + "Cheetah_Generation_data.lic",true))));
+
+        RegisterMCSet("BDT_Inelasticity", MCSet(mc_dataPath,"BDT_Inelasticity_992.h5",{false,0},992,1.27,-1,
+                     LW::MakeGeneratorsFromLICFile(tools::CheckedFilePath(mc_dataPath + "/" + "Platinum_Generation_data.lic",true))));
+
+        RegisterMCSet("BDT_Tau_Inelasticity", MCSet(mc_dataPath,"BDT_Tau_Inelasticity_1000.h5",{false,0},1000,1.27,-1,
+                     LW::MakeGeneratorsFromLICFile(tools::CheckedFilePath(mc_dataPath + "/" + "Platinum_Tau.lic",true))));
+
+        RegisterMCSet("BDT_Test_HE", MCSet(mc_dataPath,"BDT_19738",{true,1},992,1.27,-1,
+                     LW::MakeGeneratorsFromLICFile(tools::CheckedFilePath(mc_dataPath + "/" + "Platinum_Generation_data.lic",true))));
+
+        RegisterMCSet("BDT_Split_HE", MCSet(mc_dataPath,"BDT_19738",{true,5},19738,1.27,-1,
+                     LW::MakeGeneratorsFromLICFile(tools::CheckedFilePath(mc_dataPath + "/" + "Platinum_Generation_data.lic",true))));
+
+        RegisterMCSet("BDT_Tau", MCSet(mc_dataPath,"BDT_Tau.h5",{false,0},5000,1.27,-1,
+                     LW::MakeGeneratorsFromLICFile(tools::CheckedFilePath(mc_dataPath + "/" + "Platinum_Tau.lic",true))));
+
+        RegisterMCSet("Platinum_Split_HE", MCSet(mc_dataPath,"Platinum_98000",{true,98},98000/5.,1.27,-1,
+                     LW::MakeGeneratorsFromLICFile(tools::CheckedFilePath(mc_dataPath + "/" + "Platinum_Generation_data.lic",true))));
+
+        // Compound tags
+        RegisterSimulationTag("Platinum_Split_Plus_Tau", {"Platinum_Split_HE", "Platinum_Tau"});
+        RegisterSimulationTag("BDT_Inelasticity_Plus_Tau", {"BDT_Inelasticity", "BDT_Tau_Inelasticity"});
+        RegisterSimulationTag("BDT_Split_HE_Plus_Tau", {"BDT_Split_HE", "BDT_Tau"});
+        RegisterSimulationTag("BDT_Test_HE_Plus_Tau", {"BDT_Test_HE", "BDT_Tau"});
+        RegisterSimulationTag("BDT1_Split_HE_Plus_Tau", {"BDT1_Split_HE", "BDT1_Tau"});
+        RegisterSimulationTag("BDT1_Test_HE_Plus_Tau", {"BDT1_Test_HE", "BDT1_Tau"});
+
+        defaults_initialized_ = true;
+      }
+
+      /**
+      * @brief Retrieve simulation sets for a given tag.
+      *
+      * Checks compound tags first, then direct matches, then _LE/_HE/_EHE suffixes.
+      *
+      * @param simulation_tag Tag identifying the desired simulation set(s).
+      * @return std::vector<MCSet> The requested MCSet objects.
+      * @throw std::runtime_error If the tag cannot be resolved.
+      */
+      std::vector<MCSet> GetSimulationSets(const std::string& simulation_tag) const {
+        // Check compound tags
+        auto ct = compoundTags_.find(simulation_tag);
+        if (ct != compoundTags_.end()) {
+          std::vector<MCSet> result;
+          for (const auto& name : ct->second) {
+            auto it = simInfo_.find(name);
+            if (it == simInfo_.end())
+              throw std::runtime_error("MCSetRegistry: compound tag '" + simulation_tag +
+                                       "' references unknown MCSet '" + name + "'");
+            result.push_back(it->second);
+          }
+          return result;
+        }
+
+        // Direct match
+        if (simInfo_.count(simulation_tag))
+          return {simInfo_.at(simulation_tag)};
+
+        // Try _LE/_HE/_EHE suffix combinations
+        bool has_LE  = simInfo_.count(simulation_tag+"_LE")  > 0;
+        bool has_HE  = simInfo_.count(simulation_tag+"_HE")  > 0;
+        bool has_EHE = simInfo_.count(simulation_tag+"_EHE") > 0;
+
+        if (has_LE && has_HE && has_EHE)
+          return {simInfo_.at(simulation_tag+"_LE"), simInfo_.at(simulation_tag+"_HE"), simInfo_.at(simulation_tag+"_EHE")};
+        else if (has_LE && has_HE)
+          return {simInfo_.at(simulation_tag+"_LE"), simInfo_.at(simulation_tag+"_HE")};
+        else if (has_HE && has_EHE)
+          return {simInfo_.at(simulation_tag+"_HE"), simInfo_.at(simulation_tag+"_EHE")};
+        else if (has_LE && has_EHE)
+          return {simInfo_.at(simulation_tag+"_LE"), simInfo_.at(simulation_tag+"_EHE")};
+        else if (has_LE)
+          return {simInfo_.at(simulation_tag+"_LE")};
+        else if (has_HE)
+          return {simInfo_.at(simulation_tag+"_HE")};
+        else if (has_EHE)
+          return {simInfo_.at(simulation_tag+"_EHE")};
+        else
+          throw std::runtime_error("GollumFit::Invalid simulation tag: " + simulation_tag +
+                                   ". Do not append EHE, HE or LE postfix to select them both.");
+      }
+
+    private:
+      MCSetRegistry() = default;
+      std::map<std::string, MCSet> simInfo_;
+      std::map<std::string, std::vector<std::string>> compoundTags_;
+      bool defaults_initialized_ = false;
+    };
+
+
+    // ---- Backward-compatible free functions ----
+
+    /**
+    * @brief Constructs a map of simulation identifiers to MCSet objects.
+    * Delegates to MCSetRegistry singleton.
+    */
+    inline std::map<std::string,MCSet> GetSimInfo(std::string mc_dataPath)
     {
-       std::map<std::string,MCSet> simInfo = {
-
-        /*
-        * OFFICIAL ARES SETS
-        */
-        {"Cheetah_Test",MCSet(mc_dataPath,"Cheetah_Test_1.h5",{false,0},1,1.27,-1,
-                     LW::MakeGeneratorsFromLICFile(tools::CheckedFilePath(mc_dataPath + "/" + "Cheetah_Generation_data.lic",true)))
-        },
-        {"Cheetah_Mini",MCSet(mc_dataPath,"Cheetah_2997.h5",{false,0},2997,1.27,-1,
-                     LW::MakeGeneratorsFromLICFile(tools::CheckedFilePath(mc_dataPath + "/" + "Cheetah_Generation_data.lic",true)))
-        },
-        {"BDT_Test_HE",MCSet(mc_dataPath,"BDT_19738",{true,1},992,1.27,-1,
-                     LW::MakeGeneratorsFromLICFile(tools::CheckedFilePath(mc_dataPath + "/" + "Platinum_Generation_data.lic",true)))
-        },
-        {"BDT_Split_HE",MCSet(mc_dataPath,"BDT_19738",{true,5},19738,1.27,-1,
-                     LW::MakeGeneratorsFromLICFile(tools::CheckedFilePath(mc_dataPath + "/" + "Platinum_Generation_data.lic",true)))
-        },
-        {"BDT_Tau",MCSet(mc_dataPath,"BDT_Tau.h5",{false,0},5000,1.27,-1,
-                     LW::MakeGeneratorsFromLICFile(tools::CheckedFilePath(mc_dataPath + "/" + "Platinum_Tau.lic",true)))
-        },
-        {"Platinum_Split_HE",MCSet(mc_dataPath,"Platinum_98000",{true,98},98000/5.,1.27,-1,
-                     LW::MakeGeneratorsFromLICFile(tools::CheckedFilePath(mc_dataPath + "/" + "Platinum_Generation_data.lic",true)))
-        },
-
-
-      };
-      return simInfo;
+      auto& reg = MCSetRegistry::Instance();
+      if (!reg.DefaultsInitialized()) reg.InitDefaults(mc_dataPath);
+      return std::map<std::string,MCSet>(reg.GetSimInfo());
     }
-
 
     /**
     * @brief Retrieves a vector of MCSet objects based on a simulation tag.
-    * 
-    * This function allows users to retrieve various combinations of simulation 
-    * sets by specifying a simulation tag. The function searches for the 
-    * simulation sets within a map obtained from GetSimInfo(mc_dataPath). It can
-    * handle specific combinations of simulation sets (e.g., combining low 
-    * energy and high energy sets) or retrieve a single simulation set based on 
-    * the provided tag.
-    * 
-    * @param simulation_tag A string identifier for the desired simulation set(s).
-    * @param mc_dataPath The path to the directory containing the .lic and .h5 
-    * files necessary for initializing MCSet objects.
-    * @return std::vector<MCSet> A vector containing the requested MCSet objects.
-    * @throw std::runtime_error Throws if the simulation tag does not match any 
-    * predefined set or combination of sets, or if appending "_LE", "_HE", or 
-    * "_EHE" does not result in valid sets.
+    * Delegates to MCSetRegistry singleton.
     */
-    std::vector<MCSet> GetSimulationSets(std::string simulation_tag, std::string mc_dataPath){
-      auto simulations = GetSimInfo(mc_dataPath);
-
-      if(simulation_tag=="Cheetah_Test")
-          return {simulations.at("Cheetah_Test")};
-      
-      if(simulation_tag=="Cheetah_Mini")
-          return {simulations.at("Cheetah_Mini")};
-
-      if(simulation_tag=="Platinum_Split_Plus_Tau")
-          return {simulations.at("Platinum_Split_HE"), simulations.at("Platinum_Tau")};
-
-      if(simulation_tag=="BDT_Split_HE_Plus_Tau")
-          return {simulations.at("BDT_Split_HE"), simulations.at("BDT_Tau")};
-
-      if(simulation_tag=="BDT_Test_HE_Plus_Tau")
-          return {simulations.at("BDT_Test_HE"), simulations.at("BDT_Tau")};
-
-      if(simulation_tag=="BDT1_Split_HE_Plus_Tau")
-          return {simulations.at("BDT1_Split_HE"), simulations.at("BDT1_Tau")};
-
-      if(simulation_tag=="BDT1_Test_HE_Plus_Tau")
-          return {simulations.at("BDT1_Test_HE"), simulations.at("BDT1_Tau")};
-
-      // user specifies directly the simulation they want
-      if(not (simulations.find(simulation_tag) == simulations.end()))
-        return {simulations.at(simulation_tag)};
-
-      // else we use LE and HE sets
-      if((not (simulations.find(simulation_tag+"_LE") == simulations.end())) and (not (simulations.find(simulation_tag+"_HE") == simulations.end())) and (not (simulations.find(simulation_tag+"_EHE") == simulations.end())))
-        return {simulations.at(simulation_tag+"_LE"),simulations.at(simulation_tag+"_HE"),simulations.at(simulation_tag+"_EHE")};
-      else if ((not (simulations.find(simulation_tag+"_LE") == simulations.end())) and (not (simulations.find(simulation_tag+"_HE") == simulations.end())))
-        return {simulations.at(simulation_tag+"_LE"),simulations.at(simulation_tag+"_HE")};
-      else if ((not (simulations.find(simulation_tag+"_HE") == simulations.end())) and (not (simulations.find(simulation_tag+"_EHE") == simulations.end())))
-        return {simulations.at(simulation_tag+"_HE"),simulations.at(simulation_tag+"_EHE")};
-      else if ((not (simulations.find(simulation_tag+"_LE") == simulations.end())) and (not (simulations.find(simulation_tag+"_EHE") == simulations.end())))
-        return {simulations.at(simulation_tag+"_LE"),simulations.at(simulation_tag+"_EHE")};
-      else if ((not (simulations.find(simulation_tag+"_LE") == simulations.end())))
-        return {simulations.at(simulation_tag+"_LE")};
-      else if ((not (simulations.find(simulation_tag+"_HE") == simulations.end())))
-        return {simulations.at(simulation_tag+"_HE")};
-      else if ((not (simulations.find(simulation_tag+"_EHE") == simulations.end())))
-        return {simulations.at(simulation_tag+"_EHE")};
-      else
-        throw std::runtime_error("GollumFit::Invalid simulation tag: "+ simulation_tag + ". Do not append EHE, HE or LE postfix to select them both.");
+    inline std::vector<MCSet> GetSimulationSets(std::string simulation_tag, std::string mc_dataPath){
+      auto& reg = MCSetRegistry::Instance();
+      if (!reg.DefaultsInitialized()) reg.InitDefaults(mc_dataPath);
+      return reg.GetSimulationSets(simulation_tag);
     }
 
   } // close sterile namespace

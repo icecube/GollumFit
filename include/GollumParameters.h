@@ -27,7 +27,16 @@
 namespace gollumfit{
 
 /**
-* 
+* @enum LikelihoodType
+* @brief Specifies the type of likelihood function to use in the fit.
+*/
+enum class LikelihoodType {
+  SAY,      ///< SAY likelihood with MC statistical uncertainty (default)
+  Poisson   ///< Simple Poisson likelihood without MC stats correction
+};
+
+/**
+*
 * @struct FitParameters
 * @brief Struct to store all the nuisance parameters for the fit.
 */
@@ -587,7 +596,10 @@ struct SteeringParams {
 
   double change_tol = 1.e-20;
   double grad_tol = 1.e-20;
+  double grad_factor = 1.e-3;
   double uncertaintyModSigmaOverMu = 0.;
+
+  LikelihoodType likelihoodType = LikelihoodType::SAY;  ///< Likelihood function type (SAY or Poisson)
 
   std::string model_label;
   std::string simToLoad;

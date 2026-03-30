@@ -15,6 +15,7 @@
 #include <queue>
 #include <vector>
 #include <memory>
+#include <variant>
 
 #include <LeptonWeighter/Weighter.h>
 #include <LeptonWeighter/Flux.h>
@@ -100,7 +101,10 @@ using BasicPrior = FixedSizePriorSet<GaussianPrior,
                                      GaussianPrior>;
 
 using CPrior = ArbitraryPriorType<PriorIndices, BasicPrior, GaussianNDPrior<16>, GaussianNDPrior<9>>::type;
-using LType=LikelihoodProblem<std::reference_wrapper<const Event>, HistType,simpleLocalDataWeighterConstructor,sterile::WeighterMaker,CPrior,SAYLikelihoodRelativeUncertaintyMod,38>;
+using LTypeSAY=LikelihoodProblem<std::reference_wrapper<const Event>, HistType,simpleLocalDataWeighterConstructor,sterile::WeighterMaker,CPrior,SAYLikelihoodRelativeUncertaintyMod,38>;
+using LTypePoisson=LikelihoodProblem<std::reference_wrapper<const Event>, HistType,simpleLocalDataWeighterConstructor,sterile::WeighterMaker,CPrior,poissonLikelihood,38>;
+using LType = LTypeSAY;  // Default type alias for backward compatibility
+using LikelihoodVariant = std::variant<std::shared_ptr<LTypeSAY>, std::shared_ptr<LTypePoisson>>;
 using hist_marray=marray<double,3>;
 
 // New marray types for split histogram structure
@@ -226,8 +230,8 @@ class GollumFit {
     // cosmic ray splines
     std::map<CosmicRayParameter,std::shared_ptr<LW::nuSQUIDSAtmFlux<>>> cosmicRayFluxWeighter_;
 
-    // likehood problem object
-    std::shared_ptr<LType> prob_;
+    // likehood problem object (variant to support multiple likelihood types)
+    LikelihoodVariant prob_;
 
     // Nasty template part of fit function
 
