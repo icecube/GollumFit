@@ -152,6 +152,38 @@ Other available tools include:
 - `DDMFluxMaker` - Create DaemonFlux fluxes and covariance matrices
 - `FluxOscCalculator` - Calculate oscillated astrophysical neutrino fluxes
 
+#### 7. Optional: Diver (Differential Evolution Optimizer)
+
+[Diver](https://github.com/diveropt/Diver) is a differential evolution optimizer that can be used as an alternative minimizer in GollumFit.
+
+**Prerequisites:**
+- `gfortran`
+- MPI (`mpif90`)
+
+**Build Diver:**
+```bash
+git clone https://github.com/diveropt/Diver.git
+cd Diver
+make libdiver.so
+```
+
+**Environment Setup:**
+
+Add the following to your environment so that GollumFit can find Diver at build and runtime:
+```bash
+export DIVER_DIR=/path/to/Diver
+export LD_LIBRARY_PATH=$DIVER_DIR/lib:$LD_LIBRARY_PATH
+export CPLUS_INCLUDE_PATH=$DIVER_DIR/include:$CPLUS_INCLUDE_PATH
+```
+
+**Rebuild GollumFit Python Bindings with Diver:**
+
+After installing Diver, rebuild the Python bindings so that Diver fitting is available in `GollumFitPy`:
+```bash
+cd $GOLLUMSOURCEPATH/GollumFit/python
+python setup.py install --prefix=$PREFIX
+```
+
 ### Troubleshooting
 
 (This section is reserved for common installation issues and their solutions.)

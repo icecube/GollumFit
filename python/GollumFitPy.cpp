@@ -6,6 +6,7 @@
 
 #include <functional>
 #include "GollumFit.h"
+#include "GollumFitDiverWrapper.h"
 
 #include <numpy/ndarrayobject.h>
 #include <numpy/ndarraytypes.h>
@@ -183,6 +184,11 @@ PYBIND11_MODULE(GollumFitPy, m)
     .def_readwrite("energyName",&GF::SteeringParams::energyName)
     .def_readwrite("selectionStart",&GF::SteeringParams::selectionStart)
     .def_readwrite("enableTotalNorm",&GF::SteeringParams::enableTotalNorm)
+    .def_readwrite("diver_maxgen",&GF::SteeringParams::diver_maxgen, "Maximum generations for Diver optimizer")
+    .def_readwrite("diver_NP",&GF::SteeringParams::diver_NP, "Population size for Diver optimizer")
+    .def_readwrite("diver_F",&GF::SteeringParams::diver_F, "Mutation factor for Diver optimizer")
+    .def_readwrite("diver_Cr",&GF::SteeringParams::diver_Cr, "Crossover rate for Diver optimizer")
+    .def_readwrite("diver_seed",&GF::SteeringParams::diver_seed, "Random seed for Diver optimizer")
   ;
 
 
@@ -311,6 +317,7 @@ PYBIND11_MODULE(GollumFitPy, m)
   py::class_<GF::FitParametersFlag, std::shared_ptr<GF::FitParametersFlag> >(m, "FitParametersFlag")
     .def(py::init<>())
     .def(py::init<bool>())
+    .def(py::init<>())
     .def_readwrite("convNorm",&GF::FitParametersFlag::convNorm)
     .def_readwrite("promptNorm",&GF::FitParametersFlag::promptNorm)
     .def_readwrite("zenithCorrection",&GF::FitParametersFlag::zenithCorrection)
@@ -469,6 +476,35 @@ PYBIND11_MODULE(GollumFitPy, m)
     .def("SetFitParametersFlag",&GF::GollumFit::SetFitParametersFlag)
     .def("SetFitParametersBound",&GF::GollumFit::SetFitParametersBound)
     .def("SetFitParametersPriors",&GF::GollumFit::SetFitParametersPriors)
+    .def("Dive",
+        [](
+            std::shared_ptr<GF::GollumFit> gf,
+            GF::FitParameters fit_params,
+            const GF::FitParametersBound& bounds,
+            const GF::Priors& priors,
+            const std::string& path
+        )
+        {
+            return gollumfit::diver::Dive(
+                gf,
+                fit_params,
+                bounds,
+                priors,
+                path
+            );
+        },
+        py::arg("fit_params"),
+        py::arg("bounds"),
+        py::arg("priors"),
+        py::arg("path"),
+        "Run Diver DE optimizer with prior-aware initialisation.\n"
+        "Initial population is sampled from priors, truncated by bounds.\n"
+        "Diver parameters (maxgen, NP, F, Cr, seed) are read from SteeringParams.\n"
+        "\n"
+        "Example:\n"
+        "    steer.diver_maxgen = 100\n"
+        "    steer.diver_NP = 200\n"
+        "    result = g.Dive(seed, bounds, priors, path)\n")
     .def("GetSteeringParams",&GF::GollumFit::GetSteeringParams)
     .def("GetDataPaths",&GF::GollumFit::GetDataPaths)
   ;
