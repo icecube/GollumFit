@@ -124,7 +124,7 @@ Compile the main GollumFit library:
 
 ```bash
 cd $GOLLUMSOURCEPATH/GollumFit
-./configure --prefix=$PREFIX --with-boost=$BOOST_DIR
+./configure --prefix=$PREFIX --with-boost=$BOOST_DIR --with-nusquids=$PREFIX --with-leptonweighter=$PREFIX
 make
 make install
 ```

@@ -83,8 +83,8 @@ gollumfit = gf.GollumFit(datapaths, steering_params)
 metascaling = 0.25
 gollumfit.ConstructFastMode(metascaling)
 
-# Write to file (output will be STERILE.meows in the specified directory)
-gollumfit.WriteCompact("example.fastmc")
+# Write to file
+gollumfit.WriteCompact("compact.fastmc")
 
 print("Done generating FastMC.")
 

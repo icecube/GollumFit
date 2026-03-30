@@ -66,8 +66,8 @@ extra_objs = glob.glob(gollum_space_path + "/lib/*.o")
 extra_link_args = []
 if sys.platform == "darwin":
     extra_link_args += ["-Wl,-rpath,@loader_path"]
-    for d in library_dirs:
-        extra_link_args += [f"-Wl,-rpath,{d}"]
+for d in library_dirs:
+    extra_link_args += [f"-Wl,-rpath,{d}"]
 
 ext = Pybind11Extension(
     "GollumFitPy",
@@ -81,4 +81,8 @@ ext = Pybind11Extension(
     language="c++",
 )
 
-setup(ext_modules=[ext])
+setup(
+    name='GollumFitPy',
+    version='1.2.0',
+    ext_modules=[ext]
+)

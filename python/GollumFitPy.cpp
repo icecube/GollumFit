@@ -315,6 +315,7 @@ PYBIND11_MODULE(GollumFitPy, m)
   ;
 
   py::class_<GF::FitParametersFlag, std::shared_ptr<GF::FitParametersFlag> >(m, "FitParametersFlag")
+    .def(py::init<>())
     .def(py::init<bool>())
     .def(py::init<>())
     .def_readwrite("convNorm",&GF::FitParametersFlag::convNorm)
@@ -504,6 +505,8 @@ PYBIND11_MODULE(GollumFitPy, m)
         "    steer.diver_maxgen = 100\n"
         "    steer.diver_NP = 200\n"
         "    result = g.Dive(seed, bounds, priors, path)\n")
+    .def("GetSteeringParams",&GF::GollumFit::GetSteeringParams)
+    .def("GetDataPaths",&GF::GollumFit::GetDataPaths)
   ;
 
   py::enum_<LW::ParticleType>(m, "ParticleType")
