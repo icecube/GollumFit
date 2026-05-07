@@ -6,7 +6,7 @@ GollumFit is an open-source framework for performing binned-likelihood, high-ene
 
 Full documentation, including installation instructions, code structure, and usage examples, is available at:
 
-**[https://docs.icecube.aq/gollumfit/](https://docs.icecube.aq/gollumfit/)**
+**[https://docs.icecube.aq/gollumfit/](https://docs.icecube.aq/gollumfit/main)**
 
 ## Quick Start
 
