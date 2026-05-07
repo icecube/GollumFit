@@ -33,12 +33,15 @@
 
 namespace gollumfit{
 
+/// @brief Weighter that returns the pre-cached weight stored on each event.
+/// Used by the likelihood problem to retrieve event weights for data.
 struct simpleLocalDataWeighter{
   double operator()(const Event& e) const{
     return(e.cachedWeight);
   }
 };
 
+/// @brief Constructor for @c simpleLocalDataWeighter; ignores fit parameters and always returns a @c simpleLocalDataWeighter.
 struct simpleLocalDataWeighterConstructor{
     template<typename DataType>
     simpleLocalDataWeighter operator()(const std::vector<DataType> params) const{
@@ -50,8 +53,18 @@ struct simpleLocalDataWeighterConstructor{
 using namespace nusquids;
 using namespace phys_tools::histograms;
 using namespace phys_tools::likelihood;
+
+/// @brief 3D analysis histogram type (energy × cos(zenith) × topology), storing references to @c Event objects in each bin.
 using HistType = std::tuple< histogram<3,entryStoringBin<std::reference_wrapper<const Event>>> >;
+
+/// @brief Index groupings for the three correlated prior blocks:
+/// - indices 0–3: uncorrelated parameters
+/// - indices 4–19: flux parameters sharing the 16×16 correlation matrix
+/// - indices 20–28: ice gradient parameters sharing the 9×9 correlation matrix
 using PriorIndices = std::tuple<phys_tools::likelihood::parameters<>,phys_tools::likelihood::parameters<4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19>,phys_tools::likelihood::parameters<20,21,22,23,24,25,26,27,28>>;
+
+/// @brief The 38-parameter independent prior set (Gaussian for all parameters except @c astroPivot which uses a UniformPrior).
+/// Parameter order matches @c ConvertFitParameters.
 using BasicPrior = FixedSizePriorSet<GaussianPrior,
                                      GaussianPrior,
                                      GaussianPrior,
@@ -86,15 +99,32 @@ using BasicPrior = FixedSizePriorSet<GaussianPrior,
                                      GaussianPrior,
                                      GaussianPrior,
                                      GaussianPrior,
-                                     UniformPrior,
+                                     UniformPrior,   // astroPivot
                                      GaussianPrior,
                                      GaussianPrior,
                                      GaussianPrior>;
 
+/// @brief Full correlated prior type: combines @c BasicPrior with a 16×16 multivariate Gaussian for flux parameters
+/// and a 9×9 multivariate Gaussian for ice gradient parameters.
 using CPrior = ArbitraryPriorType<PriorIndices, BasicPrior, GaussianNDPrior<16>, GaussianNDPrior<9>>::type;
+
+/// @brief The complete likelihood problem type, templating over the event type, histogram, data weighter,
+/// MC weighter maker, prior, MC statistical uncertainty modifier, and number of nuisance parameters.
 using LType=LikelihoodProblem<std::reference_wrapper<const Event>, HistType,simpleLocalDataWeighterConstructor,sterile::WeighterMaker,CPrior,SAYLikelihoodRelativeUncertaintyMod,38>;
+
+/// @brief Convenience alias for a 3D array of doubles (topology × cos(zenith) × energy) used to return histograms.
 using hist_marray=marray<double,3>;
 
+/**
+* @brief Fills a histogram by iterating over a container of events and applying a binner.
+*
+* @tparam ContainerType Container type holding @c Event objects.
+* @tparam HistType Histogram type to fill.
+* @tparam BinnerType Callable that places a single event into the histogram.
+* @param data The container of events to bin.
+* @param hist The histogram to fill.
+* @param binner The binning functor.
+*/
 template<typename ContainerType, typename HistType, typename BinnerType>
   void bin(const ContainerType& data, HistType& hist, const BinnerType& binner){
   for(const Event& event : data)
@@ -111,37 +141,37 @@ template<typename ContainerType, typename HistType, typename BinnerType>
 */
 class GollumFit {
   private:
-    // All the local configuration variables
-    SteeringParams  steeringParams_; ///
-    DataPaths       dataPaths_;
+    // Configuration
+    SteeringParams  steeringParams_; ///< Analysis configuration (binning, energy range, tolerances, etc.)
+    DataPaths       dataPaths_;      ///< File and directory paths for all input resources
 
-    // to store events
-    std::deque<Event> metaEvents_;
-    std::deque<Event> mainSimulation_;
-    std::deque<Event> sample_;
+    // Event containers
+    std::deque<Event> metaEvents_;      ///< FastMC meta-events (used when FastMC mode is active)
+    std::deque<Event> mainSimulation_;  ///< Full MC simulation events
+    std::deque<Event> sample_;          ///< Experimental data events
 
-    // for fast mode only
-    std::deque<Event> auxSimulation_;
+    // Auxiliary simulation (FastMC only)
+    std::deque<Event> auxSimulation_;   ///< Secondary simulation container used during FastMC construction
 
-    // histograms
-    HistType dataHist_; // analysis data
-    HistType simHist_; // analysis MC is
+    // Histograms
+    HistType dataHist_; ///< Binned data histogram (energy × cos(zenith) × topology)
+    HistType simHist_;  ///< Binned MC simulation histogram (energy × cos(zenith) × topology)
 
-    // minimizing objects
-    std::vector<FitParameters> fitSeed_;
-    FitParameters asimovSeed_;
-    FitParametersFlag fixedParams_;
-    FitParametersBound boundParams_;
-    Priors priors_;
+    // Minimization configuration
+    std::vector<FitParameters> fitSeed_; ///< Initial parameter values for the minimizer (one entry per seed)
+    FitParameters asimovSeed_;           ///< Parameter values for the Asimov (nominal expectation) seed
+    FitParametersFlag fixedParams_;      ///< Flags indicating which parameters are held fixed during minimization
+    FitParametersBound boundParams_;     ///< Lower and upper bounds for each fit parameter
+    Priors priors_;                      ///< Prior distributions for the fit parameters
 
-    // weighter object
-    sterile::WeighterMaker DFWM;
-    std::shared_ptr<LW::Flux> fluxConv_,fluxPrompt_,fluxAstro_;
-    std::shared_ptr<LW::CrossSectionFromSpline> xsw_;
-    std::vector<std::shared_ptr<LW::Generator>> mcw_;
-    std::shared_ptr<LW::Weighter> convFluxWeighter_;
-    std::shared_ptr<LW::Weighter> promptFluxWeighter_;
-    std::shared_ptr<LW::Weighter> astroFluxWeighter_;
+    // Flux and cross section weighters (LeptonWeighter objects)
+    sterile::WeighterMaker DFWM;                               ///< Weighter maker that applies all systematic weight corrections to MC events
+    std::shared_ptr<LW::Flux> fluxConv_,fluxPrompt_,fluxAstro_; ///< nuSQuIDS flux objects for conventional, prompt, and astrophysical components
+    std::shared_ptr<LW::CrossSectionFromSpline> xsw_;          ///< Neutrino cross section weighter (loaded from splines)
+    std::vector<std::shared_ptr<LW::Generator>> mcw_;          ///< MC generation weighters, one per simulation set
+    std::shared_ptr<LW::Weighter> convFluxWeighter_;           ///< LeptonWeighter for the conventional atmospheric flux
+    std::shared_ptr<LW::Weighter> promptFluxWeighter_;         ///< LeptonWeighter for the prompt atmospheric flux
+    std::shared_ptr<LW::Weighter> astroFluxWeighter_;          ///< LeptonWeighter for the astrophysical flux
 
     // Status flags
     bool xs_weighter_constructed_ = (false);
@@ -1301,6 +1331,6 @@ class GollumFit {
 
 };
 
-} // close namespace SterileSearch
+} // namespace gollumfit
 
 #endif /* GOLLUMFIT_H_ */
