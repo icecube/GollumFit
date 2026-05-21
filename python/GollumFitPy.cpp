@@ -6,8 +6,12 @@
 
 #include <functional>
 #include "GollumFit.h"
-#include "GollumFitDiverWrapper.h"
 
+#ifdef GOLLUMFIT_HAVE_DIVER
+#include "GollumFitDiverWrapper.h"
+#endif
+
+#include <stdexcept>
 #include <numpy/ndarrayobject.h>
 #include <numpy/ndarraytypes.h>
 #include <numpy/ufuncobject.h>
@@ -476,6 +480,7 @@ PYBIND11_MODULE(GollumFitPy, m)
     .def("SetFitParametersFlag",&GF::GollumFit::SetFitParametersFlag)
     .def("SetFitParametersBound",&GF::GollumFit::SetFitParametersBound)
     .def("SetFitParametersPriors",&GF::GollumFit::SetFitParametersPriors)
+#ifdef GOLLUMFIT_HAVE_DIVER
     .def("Dive",
         [](
             std::shared_ptr<GF::GollumFit> gf,
@@ -505,6 +510,28 @@ PYBIND11_MODULE(GollumFitPy, m)
         "    steer.diver_maxgen = 100\n"
         "    steer.diver_NP = 200\n"
         "    result = g.Dive(seed, bounds, priors, path)\n")
+#else
+    .def("Dive",
+        [](
+            std::shared_ptr<GF::GollumFit>,
+            GF::FitParameters,
+            const GF::FitParametersBound&,
+            const GF::Priors&,
+            const std::string&
+        ) -> GF::FitResult
+        {
+            throw std::runtime_error(
+                "GollumFitPy was built without Diver support. "
+                "Rebuild with DIVER_DIR=/path/to/Diver after building libdiver.so."
+            );
+        },
+        py::arg("fit_params"),
+        py::arg("bounds"),
+        py::arg("priors"),
+        py::arg("path"),
+        "Diver support is not enabled in this GollumFitPy build.\n"
+        "Rebuild with DIVER_DIR=/path/to/Diver after building libdiver.so.\n")
+#endif
     .def("GetSteeringParams",&GF::GollumFit::GetSteeringParams)
     .def("GetDataPaths",&GF::GollumFit::GetDataPaths)
   ;

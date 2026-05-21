@@ -138,7 +138,7 @@ cd $GOLLUMSOURCEPATH/GollumFit/python
 python setup.py install --prefix=$PREFIX
 ```
 
-#### 6. Optional Helper Tools
+#### 6. Optional: Helper Tools
 
 After the main build, you may optionally compile various utility tools in the resources folder. For example, to build the flux oscillation calculator:
 
@@ -156,7 +156,9 @@ Other available tools include:
 
 [Diver](https://github.com/diveropt/Diver) is a differential evolution optimizer that can be used as an alternative minimizer in GollumFit.
 
-**Prerequisites:**
+GollumFit does not require Diver for a normal build. The Python bindings auto-enable Diver only when Diver is installed under `$PREFIX` or when `DIVER_DIR` is set, so users who do not need the Diver optimizer can skip this section.
+
+**Diver prerequisites:**
 - `gfortran`
 - MPI (`mpif90`)
 
@@ -165,24 +167,33 @@ Other available tools include:
 git clone https://github.com/diveropt/Diver.git
 cd Diver
 make libdiver.so
+test -f lib/libdiver.so
 ```
 
-**Environment Setup:**
+**Install Diver into `$PREFIX`:**
 
-Add the following to your environment so that GollumFit can find Diver at build and runtime:
+Installing the Diver header and library under the same `$PREFIX` used for GollumFit lets `setup.py` find Diver automatically on later builds:
 ```bash
-export DIVER_DIR=/path/to/Diver
-export LD_LIBRARY_PATH=$DIVER_DIR/lib:$LD_LIBRARY_PATH
-export CPLUS_INCLUDE_PATH=$DIVER_DIR/include:$CPLUS_INCLUDE_PATH
+mkdir -p $PREFIX/include $PREFIX/lib
+cp include/diver.h include/diver.hpp $PREFIX/include/
+cp lib/libdiver.so $PREFIX/lib/
 ```
 
 **Rebuild GollumFit Python Bindings with Diver:**
 
-After installing Diver, rebuild the Python bindings so that Diver fitting is available in `GollumFitPy`:
+After installing Diver into `$PREFIX`, rebuild the Python bindings so that Diver fitting is available in `GollumFitPy`:
 ```bash
 cd $GOLLUMSOURCEPATH/GollumFit/python
 python setup.py install --prefix=$PREFIX
 ```
+
+If you prefer not to install Diver into `$PREFIX`, set `DIVER_DIR` for the rebuild instead:
+```bash
+export DIVER_DIR=/path/to/Diver
+export LD_LIBRARY_PATH=$DIVER_DIR/lib:$LD_LIBRARY_PATH
+```
+
+If Diver is not found in `$PREFIX` and `DIVER_DIR` is not set, this command builds `GollumFitPy` without Diver support. Calling `GollumFit.Dive(...)` from such a build raises a clear runtime error instead of making Diver a required install dependency. Set `GOLLUMFIT_WITH_DIVER=0` to force a no-Diver build even when Diver is installed in `$PREFIX`.
 
 ### Troubleshooting
 
