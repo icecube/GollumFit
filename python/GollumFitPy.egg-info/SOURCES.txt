@@ -1,0 +1,9 @@
+GollumFitPy.cpp
+container_conversions.h
+pyproject.toml
+setup.py
+GollumFitPy.egg-info/PKG-INFO
+GollumFitPy.egg-info/SOURCES.txt
+GollumFitPy.egg-info/dependency_links.txt
+GollumFitPy.egg-info/requires.txt
+GollumFitPy.egg-info/top_level.txt
