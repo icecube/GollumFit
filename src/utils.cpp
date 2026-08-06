@@ -41,3 +41,16 @@ std::vector<double> edgesToCenters(const std::vector<double> & edges) {
     return res;
 }
 
+std::string get_current_datetime_string() {
+    using namespace std::chrono;
+
+    const auto now = system_clock::now();
+    const std::time_t t = system_clock::to_time_t(now);
+
+    std::tm tm{};
+    gmtime_r(&t, &tm);
+
+    std::ostringstream oss;
+    oss << std::put_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
+    return oss.str();
+}
