@@ -551,11 +551,11 @@ steering_params.maxCosth       = 0.0
 steering_params.cosThbinEdge   = 0.0
 steering_params.cosThbinWidth  = 0.05
 steering_params.selectionStart = float("DnnEnergy_0.99".split("_")[1])
-steering_params.evalThreads    = 1
+steering_params.evalThreads    = 8       # use the CPUs allocated to the job
 
 # Convergence criteria (tight tolerances for accurate minimization)
-steering_params.change_tol     = 1.e-20
-steering_params.grad_tol       = 1.e-20
+steering_params.change_tol     = 1.e-6   # absolute dLLH per iteration
+steering_params.grad_tol       = 1.e-6   # scaled projected gradient
 steering_params.uncertaintyModSigmaOverMu = 0.0
 ```
 

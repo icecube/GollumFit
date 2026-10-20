@@ -155,11 +155,13 @@ steering_params.maxCosth       = 0.0
 steering_params.cosThbinEdge   = 0.0
 steering_params.cosThbinWidth  = 0.05
 steering_params.selectionStart = float("DnnEnergy_0.99".split("_")[1])
-steering_params.evalThreads    = 1
+# Number of evaluation threads (override with GOLLUM_THREADS; use the CPUs requested from SLURM)
+steering_params.evalThreads    = int(os.environ.get("GOLLUM_THREADS", "1"))
 
-# Convergence criteria (tight tolerances for accurate minimization)
-steering_params.change_tol     = 1.e-20
-steering_params.grad_tol       = 1.e-20
+# Convergence criteria: absolute change of the log-likelihood between iterations and
+# largest scaled component of the projected gradient (override with GOLLUM_CHANGE_TOL / GOLLUM_GRAD_TOL)
+steering_params.change_tol     = float(os.environ.get("GOLLUM_CHANGE_TOL", "1.e-6"))
+steering_params.grad_tol       = float(os.environ.get("GOLLUM_GRAD_TOL", "1.e-6"))
 steering_params.uncertaintyModSigmaOverMu = 0.0
 
 #####################################################################################
@@ -187,7 +189,10 @@ gollumfit.ConstructLikelihoodProblem()
 # perform the minimization
 #####################################################################################
 print("Starting minimization...")
+import time
+t_fit0 = time.time()
 min_llh = gollumfit.MinLLH()
+print("MinLLH wall time: %.1f s" % (time.time() - t_fit0))
 
 #####################################################################################
 # results: print the best fit nuisance parameters, likelihood, and the number of LLH evaluations
