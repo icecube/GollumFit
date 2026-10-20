@@ -1,0 +1,460 @@
+diff --git a/PhysTools/ThreadPool.h b/PhysTools/ThreadPool.h
+index df2ec91..719225f 100644
+--- a/PhysTools/ThreadPool.h
++++ b/PhysTools/ThreadPool.h
+@@ -43,6 +43,7 @@ public:
+     template<class F, class... Args>
+     auto enqueue(F&& f, Args&&... args)
+ 	-> std::future<typename std::result_of<F(Args...)>::type>;
++    size_t size() const{ return(workers.size()); }
+     // the destructor joins all threads
+     ~ThreadPool(){
+         {
+diff --git a/PhysTools/histogram.h b/PhysTools/histogram.h
+index 72a5e9e..dc0ed49 100644
+--- a/PhysTools/histogram.h
++++ b/PhysTools/histogram.h
+@@ -992,6 +992,12 @@ namespace phys_tools{
+ 				return(getBin(coordinates)*scale);
+ 			}
+ 			
++			///Direct read access to the bin at the passed internal coordinates:
++			///no content scaling and no copy of the bin contents.
++			const StoreType& binRef(const internalCoordinate coordinates[]) const{
++				return(this->getBin(coordinates));
++			}
++			
+ 			///Get the value stored in the bin corresponding to the passed set of N (internal) coordinates
+ 			template<typename... Args>
+ 			modificationProxy operator()(Args... args){
+diff --git a/PhysTools/likelihood/likelihood.h b/PhysTools/likelihood/likelihood.h
+index b0dcab9..284baf4 100644
+--- a/PhysTools/likelihood/likelihood.h
++++ b/PhysTools/likelihood/likelihood.h
+@@ -31,6 +31,7 @@
+ 
+ #include <type_traits>
+ #include <vector>
++#include <algorithm>
+ #include <deque>
+ #include <cfenv>
+ 
+@@ -957,13 +958,13 @@ namespace likelihood{
+     struct gammaPriorPoissonLikelihood {
+         template<typename T>
+         T operator()(double k, T const & alpha, T const & beta) {
+-            std::vector<T> items(5);
++            T items[5];
+             items[0] = alpha*log(beta);
+             items[1] = lgamma(k+alpha);
+             items[2] = -lgamma(k+1);
+             items[3] = -(k+alpha)*LogOnePlusX(beta);
+             items[4] = -lgamma(alpha);
+-            return accumulate(items.begin(), items.end());
++            return accumulate(items, items+5);
+         }
+     };
+ 
+@@ -1408,11 +1409,111 @@ namespace likelihood{
+ 		//including the index of the discrete nuisance parameter combination
+ 		std::vector<double> parameterSeeds;
+ 
++		//Pairs of (observation bin, matching simulation bin), computed once per
++		//(observation,simulation) histogram pair, and grouped into tasks of
++		//roughly equal numbers of simulated events for the thread pool.
++		//Evaluations then iterate over bins by reference instead of copying
++		//bins and searching for matches.
++		template<typename HistogramType>
++		struct BinPairCache{
++			using StoreType=typename HistogramType::dataType;
++			//obs==nullptr marks a simulation bin with no counterpart in the observation
++			struct Item{ const StoreType* obs; const StoreType* sim; };
++			const HistogramType* obsHist=nullptr;
++			const HistogramType* simHist=nullptr;
++			size_t nTasks=0;
++			std::vector<Item> items;
++			std::vector<std::vector<Item>> tasks;
++
++			static void decompose(const HistogramType& h, unsigned long idx, unsigned int coords[]){
++				for(unsigned int i=0; i<HistogramType::dimensions; i++){
++					unsigned int n=h.getBinCount(i);
++					coords[i]=idx%n;
++					idx/=n;
++				}
++			}
++			static const StoreType* findMatch(const HistogramType& from, const unsigned int fromCoords[], const HistogramType& to){
++				unsigned int toCoords[HistogramType::dimensions];
++				for(unsigned int i=0; i<HistogramType::dimensions; i++){
++					double loc=from.getBinCenter(i,fromCoords[i]);
++					auto result=to.getAxis(i)->findBin(loc);
++					if(result.first!=histograms::axis::FOUND_BIN)
++						return(nullptr);
++					toCoords[i]=result.second;
++				}
++				return(&to.binRef(toCoords));
++			}
++			static size_t cost(const Item& it){
++				return(it.sim ? it.sim->size()+1 : 1);
++			}
++			void prepare(const HistogramType& observation, const HistogramType& simulation, size_t requestedTasks){
++				if(requestedTasks==0)
++					requestedTasks=1;
++				if(obsHist==&observation && simHist==&simulation && nTasks==requestedTasks)
++					return;
++				obsHist=&observation;
++				simHist=&simulation;
++				nTasks=requestedTasks;
++				items.clear();
++				unsigned int coords[HistogramType::dimensions];
++				unsigned long nObs=1, nSim=1;
++				for(unsigned int i=0; i<HistogramType::dimensions; i++){
++					nObs*=observation.getBinCount(i);
++					nSim*=simulation.getBinCount(i);
++				}
++				items.reserve(nObs);
++				for(unsigned long idx=0; idx<nObs; idx++){
++					decompose(observation,idx,coords);
++					items.push_back(Item{&observation.binRef(coords),findMatch(observation,coords,simulation)});
++				}
++				for(unsigned long idx=0; idx<nSim; idx++){
++					decompose(simulation,idx,coords);
++					if(findMatch(simulation,coords,observation)==nullptr)
++						items.push_back(Item{nullptr,&simulation.binRef(coords)});
++				}
++				//longest-processing-time-first assignment of bins to tasks
++				std::vector<size_t> order(items.size());
++				for(size_t i=0; i<order.size(); i++)
++					order[i]=i;
++				std::stable_sort(order.begin(),order.end(),[this](size_t x, size_t y){ return(cost(items[x])>cost(items[y])); });
++				tasks.assign(nTasks,std::vector<Item>());
++				std::vector<size_t> load(nTasks,0);
++				for(size_t i : order){
++					size_t best=0;
++					for(size_t t=1; t<nTasks; t++)
++						if(load[t]<load[best])
++							best=t;
++					tasks[best].push_back(items[i]);
++					load[best]+=cost(items[i]);
++				}
++			}
++		};
++		template<typename T> struct BinPairCacheTupleFor;
++		template<typename... Hs> struct BinPairCacheTupleFor<std::tuple<Hs...>>{ using type=std::tuple<BinPairCache<Hs>...>; };
++		mutable typename BinPairCacheTupleFor<HistogramsType>::type binPairCaches;
++
+ 		//warning, evil
+ 		mutable size_t lastBestDiscreteIndex;
+ 
+ 		size_t evaluationThreadCount;
+ 
++		//Worker threads are kept alive between evaluations (creating and joining
++		//a pool per evaluation costs more than evaluating small histograms).
++		//Shared between copies of the problem; evaluations are sequential.
++		mutable std::shared_ptr<ThreadPool> evaluationPool;
++
++		//If true, dump every weight and event of a bin whose expectation is
++		//non-positive while it has observed data (can produce enormous output).
++		bool verboseBadBins=false;
++
++		ThreadPool& getEvaluationPool(size_t threads) const{
++			//with a single thread the work is done inline; a pool of zero workers is just a placeholder
++			const size_t workers=(threads<=1 ? 0 : threads);
++			if(!evaluationPool || evaluationPool->size()!=workers)
++				evaluationPool=std::make_shared<ThreadPool>(workers);
++			return(*evaluationPool);
++		}
++
+ 		LikelihoodProblem(HistogramsType observation, const std::vector<HistogramsType>& simulations,
+ 						  CPrior continuousPrior, std::vector<double> discretePrior,
+ 						  const DataWeighterConstructor& dataWeightC,
+@@ -1450,6 +1551,7 @@ namespace likelihood{
+ 
+ 		void setObservation(const HistogramsType& newObs){
+ 			observation=newObs;
++			binPairCaches=typename BinPairCacheTupleFor<HistogramsType>::type();
+ 		}
+ 
+ 		void setEvaluationThreadCount(size_t count){
+@@ -1458,171 +1560,96 @@ namespace likelihood{
+ 			evaluationThreadCount=count;
+ 		}
+ 
++		void setVerboseBadBins(bool verbose){ verboseBadBins=verbose; }
++
+ 		SimulationWeighterConstructor& getSimulationWeighterConstructor(){ return(simWeightC); }
+ 		const SimulationWeighterConstructor& getSimulationWeighterConstructor() const{ return(simWeightC); }
+ 
+ 		//evaluate the (non-prior) contribution to the likelihood from one observation,expectation histogram pair
+ 		template<typename DataType, typename SimulationWeighter, typename TDataWeighter, typename HistogramType>
+ 		void evaluateLikelihoodCore(const HistogramType& observation, SimulationWeighter& weighter, TDataWeighter& dweighter, const HistogramType& simulation,
++								    BinPairCache<HistogramType>& cache,
+ 								    std::mutex& printMtx, ThreadPool& pool, std::vector<std::future<DataType>>& contributions) const{
++			using StoreType=typename HistogramType::dataType;
++			using Item=typename BinPairCache<HistogramType>::Item;
++			const size_t nTasks=(evaluationThreadCount<=1 ? 1 : 4*evaluationThreadCount);
++			cache.prepare(observation,simulation,nTasks);
+ 			const auto& likelihoodFunction=this->likelihoodFunction;
+-			auto dataWeightAccumulator=[&dweighter](double t, const Event& e){ return(t+dweighter(e)); };
+-
+-			auto likelihoodContribution=[dataWeightAccumulator,&weighter,&simulation,&likelihoodFunction,&printMtx](typename HistogramType::const_iterator it)->DataType{
+-				entryStoringBin<Event> obs=*it;
+-
+-				double observationAmount=std::accumulate(obs.begin(),obs.end(),0.0,dataWeightAccumulator);
+-
+-				std::vector<DataType> expectationWeights;
+-                std::vector<DataType> expectationSqWeights;
+-                DataType w;
+-                DataType w2;
+-                int n_events=0;
+-				typename HistogramType::const_iterator expIt=simulation.findBinIterator(it);
+-				if(expIt!=simulation.end()){
+-					/*{
+-						std::lock_guard<std::mutex> lck(printMtx);
+-						std::cout << "   exp coords:";
+-						for(unsigned int i=0; i<2; i++)
+-							std::cout << ' ' << expIt.getBinEdge(i);
+-						std::cout << std::endl;
+-					}*/
+-					const std::vector<Event>& exp=((entryStoringBin<Event>)*expIt).entries();
+-					expectationWeights.reserve(((entryStoringBin<Event>)*expIt).size());
+-					expectationSqWeights.reserve(((entryStoringBin<Event>)*expIt).size());
+-					for(const RawEvent& e : ((entryStoringBin<Event>)*expIt)){
+-                        w = weighter(e);
+-                        assert(w >= 0);
+-                        w2 = w * w;
+-                        assert(w2 >= 0);
+-                        assert(e.num_events > 0);
+-                        n_events += e.num_events;
+-						expectationWeights.push_back(w);
+-						expectationSqWeights.push_back(w2/e.num_events);
+-						if(std::isnan(expectationWeights.back()) || expectationWeights.back()<0.0){
+-							std::lock_guard<std::mutex> lck(printMtx);
+-							std::cout << "Bad weight: " << expectationWeights.back() << "\nEvent:\n" << e << std::endl;
+-							//std::cout << e.energy << ' ' << e.year << ' ' << expectationWeights.back() << std::endl;
+-						}
+-						if(std::isnan(expectationSqWeights.back()) || expectationSqWeights.back()<0.0){
+-							std::lock_guard<std::mutex> lck(printMtx);
+-							std::cout << "Bad weightSq: " << expectationSqWeights.back() << "\nEvent:\n" << e << std::endl;
+-							std::cout << "Bad weight: " << expectationWeights.back() << "\nEvent:\n" << e << std::endl;
+-							//std::cout << e.energy << ' ' << e.year << ' ' << expectationWeights.back() << std::endl;
+-						}
+-						if(std::isnan(e.num_events) || e.num_events<0.0){
+-							std::lock_guard<std::mutex> lck(printMtx);
+-							std::cout << "Bad num_events: " << e.num_events << "\nEvent:\n" << e << std::endl;
+-							//std::cout << e.energy << ' ' << e.year << ' ' << expectationWeights.back() << std::endl;
+-						}
+-						//std::cout << "    " << expectationWeights.back() << std::endl;
+-					}
++			const bool verboseBadBins=this->verboseBadBins;
++
++			//Sum the expected weights (and squared weights per generated event) of
++			//the simulated events in a bin with compensated summation. This is the
++			//same arithmetic as accumulate(), done in a running fashion so that the
++			//per-event weights are never stored.
++			auto sumBin=[&weighter](const StoreType* bin, DataType& w_sum, DataType& w2_sum){
++				w_sum=DataType(0);
++				w2_sum=DataType(0);
++				if(bin==nullptr)
++					return;
++				DataType w_err(0), w2_err(0), diff, temp;
++				for(const RawEvent& e : *bin){
++					DataType w=weighter(e);
++					assert(w >= 0);
++					assert(e.num_events > 0);
++					diff=w; diff-=w_err; temp=w_sum; temp+=diff; w_err=temp; w_err-=w_sum; w_err-=diff; w_sum=temp;
++					DataType w2=w*w;
++					w2/=static_cast<double>(e.num_events);
++					diff=w2; diff-=w2_err; temp=w2_sum; temp+=diff; w2_err=temp; w2_err-=w2_sum; w2_err-=diff; w2_sum=temp;
+ 				}
++			};
+ 
+-                //std::sort(expectationWeights.begin(), expectationWeights.end(), std::less<DataType>());
+-
+-                auto w_sum = accumulate(expectationWeights.begin(), expectationWeights.end());
+-                auto w2_sum = accumulate(expectationSqWeights.begin(), expectationSqWeights.end());
+-
+-                if(observationAmount > 0 && w_sum <= 0) {
+-                    std::cout << "BAD BIN" << std::endl;
+-                    std::cout << "Printing weights" << std::endl;
+-                    for(auto w : expectationWeights) {
+-                        std::cout << w << std::endl;
+-                    }
+-                    std::cout << "Printing events" << std::endl;
+-					for(const RawEvent& e : ((entryStoringBin<Event>)*expIt)){
+-                        std::cout << e << std::endl;
+-                    }
+-                    std::cout << "Printing data" << std::endl;
+-					for(auto e : obs) {
+-                        std::cout << e << std::endl;
+-                    }
+-                }
++			//Captured by value (the lambdas are copied into the pool tasks, which outlive this
++			//function); weighter, dweighter, likelihoodFunction and printMtx are owned by the
++			//caller, which waits for the tasks before they go out of scope.
++			auto binContribution=[&weighter,&dweighter,&likelihoodFunction,&printMtx,sumBin,verboseBadBins](const Item& bp)->DataType{
++				double observationAmount=0;
++				if(bp.obs)
++					for(const Event& e : *bp.obs)
++						observationAmount+=dweighter(e);
+ 
+-                auto contribution=likelihoodFunction(observationAmount,w_sum,w2_sum);
++				DataType w_sum, w2_sum;
++				sumBin(bp.sim,w_sum,w2_sum);
+ 
+-				/*{
++				if(std::isnan(w_sum) || w_sum<0.0 || std::isnan(w2_sum)){
+ 					std::lock_guard<std::mutex> lck(printMtx);
+-					DataType expectationAmount=std::accumulate(expectationWeights.begin(),expectationWeights.end(),DataType(0));
+-					std::cout << "   obs coords:";
+-					for(unsigned int i=0; i<3; i++)
+-						std::cout << ' ' << it.getBinEdge(i);
+-					std::cout << ' ' << contribution
+-					<< ' ' << observationAmount << ' ' << expectationAmount;
+-					std::cout << " [";
+-					for(const auto& w : expectationWeights)
+-						std::cout << ' ' << w;
+-					std::cout << ']' << std::endl;
+-				}*/
+-                //std::cout << "contribution: " << contribution << std::endl;
+-				return(contribution);
+-			};
+-			auto likelihoodContributionNoObs=[&weighter,&observation,&likelihoodFunction,&printMtx](typename HistogramType::const_iterator it)->DataType{
+-				auto obsIt=observation.findBinIterator(it);
+-
+-				//only proceed if this bin does not exist in the observation
+-				if(obsIt==observation.end()){
+-					std::vector<DataType> expectationWeights;
+-					std::vector<DataType> expectationSqWeights;
+-                    DataType w;
+-                    DataType w2;
+-                    int n_events=0;
+-					const std::vector<Event>& exp=((entryStoringBin<Event>)*it).entries();
+-					expectationWeights.reserve(((entryStoringBin<Event>)*it).size());
+-					expectationSqWeights.reserve(((entryStoringBin<Event>)*it).size());
+-					for(const RawEvent& e : ((entryStoringBin<Event>)*it)) {
+-                        w = weighter(e);
+-                        assert(w >= 0);
+-                        w2 = w*w;
+-                        assert(w2 >= 0);
+-                        assert(e.num_events > 0);
+-                        n_events += e.num_events;
+-						expectationWeights.push_back(w);
+-					    expectationSqWeights.push_back(w2/e.num_events);
+-                    }
+-
+-                    //std::sort(expectationWeights.begin(), expectationWeights.end(), std::less<DataType>());
+-
+-					//auto contribution=likelihoodFunction(0,expectationWeights,n_events);
+-				    auto contribution=likelihoodFunction(0,accumulate(expectationWeights.begin(), expectationWeights.end()),accumulate(expectationSqWeights.begin(), expectationSqWeights.end()));
+-					/*{
+-						std::lock_guard<std::mutex> lck(printMtx);
+-						DataType expectationAmount=std::accumulate(expectationWeights.begin(),expectationWeights.end(),DataType(0));
+-						std::cout << "   exp coords:";
+-						for(unsigned int i=0; i<DataDimension; i++)
+-							std::cout << ' ' << it.getBinEdge(i);
+-						std::cout << ' ' << contribution
+-						<< ' ' << 0.0 << ' ' << expectationAmount;
+-						std::cout << " [";
+-						for(const auto& w : expectationWeights)
+-							std::cout << ' ' << w;
+-						std::cout << ']' << std::endl;
+-					}*/
+-                    //std::cout << "noobs contribution: " << contribution << std::endl;
+-					return(contribution);
++					std::cout << "Bad bin weight sum: " << w_sum << " (sum of squares " << w2_sum << ")" << std::endl;
+ 				}
+-				/*{
++				if(observationAmount > 0 && w_sum <= 0 && verboseBadBins){
+ 					std::lock_guard<std::mutex> lck(printMtx);
+-					std::cout << "   exp coords:";
+-					for(unsigned int i=0; i<DataDimension; i++)
+-						std::cout << ' ' << it.getBinEdge(i);
+-					std::cout << ' ' << DataType(0)
+-					<< ' ' << 0.0 << ' ' << DataType(0);
+-					std::cout << " []" << std::endl;
+-				}*/
+-				return(0);
+-			};
++					std::cout << "BAD BIN" << std::endl;
++					std::cout << "Printing weights" << std::endl;
++					if(bp.sim)
++						for(const RawEvent& e : *bp.sim)
++							std::cout << weighter(e) << std::endl;
++					std::cout << "Printing events" << std::endl;
++					if(bp.sim)
++						for(const RawEvent& e : *bp.sim)
++							std::cout << e << std::endl;
++					std::cout << "Printing data" << std::endl;
++					if(bp.obs)
++						for(const Event& e : *bp.obs)
++							std::cout << e << std::endl;
++				}
+ 
+-			//handle all bins where there is observed data
+-			//std::cout << " bins with observations" << std::endl;
+-			for(auto it=observation.begin(), end=observation.end(); it!=end; it++)
+-				contributions.push_back(pool.enqueue(likelihoodContribution,it));
++				return(likelihoodFunction(observationAmount,w_sum,w2_sum));
++			};
++			auto taskContribution=[binContribution](const std::vector<Item>& items)->DataType{
++				DataType sum(0);
++				for(const Item& bp : items)
++					sum+=binContribution(bp);
++				return(sum);
++			};
+ 
+-			//handle all bins where there is expected data, but which are not in the observation histogram
+-			//std::cout << " bins without observations" << std::endl;
+-			for(auto it=simulation.begin(), end=simulation.end(); it!=end; it++)
+-				contributions.push_back(pool.enqueue(likelihoodContributionNoObs,it));
++			if(nTasks==1){
++				//single threaded: evaluate inline, without the pool
++				std::promise<DataType> result;
++				result.set_value(taskContribution(cache.tasks[0]));
++				contributions.push_back(result.get_future());
++				return;
++			}
++			for(const std::vector<Item>& items : cache.tasks)
++				if(!items.empty())
++					contributions.push_back(pool.enqueue(taskContribution,std::cref(items)));
+ 		}
+ 
+ //        //evaluate the (non-prior) contribution to the likelihood from one pair of observation,expectation histogram tuples
+@@ -1655,7 +1682,7 @@ namespace likelihood{
+ 				//evaluate for this pair
+ 				constexpr unsigned int idx=std::tuple_size<HistogramsType>::value - Counter;
+ 				like.evaluateLikelihoodCore(std::get<idx>(observation), weighter, dweighter, std::get<idx>(simulation),
+-									   printMtx, pool, contributions);
++									   std::get<idx>(like.binPairCaches), printMtx, pool, contributions);
+ 				//evaluate for the next pair
+ 				evaluateLikelihoodIterator<Counter-1, Likelihood, DataType, SimulationWeighter, TDataWeighter>{}
+ 					(like, observation, weighter, dweighter, simulation, printMtx, pool, contributions);
+@@ -1676,7 +1703,7 @@ namespace likelihood{
+ 		template<typename DataType, typename SimulationWeighter, typename TDataWeighter>
+ 		DataType evaluateLikelihood(SimulationWeighter weighter, TDataWeighter dweighter, const HistogramsType& simulation) const{
+ 			std::mutex printMtx;
+-	        ThreadPool pool(evaluationThreadCount);
++			ThreadPool& pool=(evaluationThreadCount<=1 ? getEvaluationPool(1) : getEvaluationPool(evaluationThreadCount));
+ 			std::vector<std::future<DataType>> contributions;
+ 			const HistogramsType& observation=this->observation;
+ 
+@@ -2032,7 +2059,6 @@ namespace likelihood{
+ 					lastBestDiscreteIndex=dn;
+ 				}
+ 			}
+-			std::cout << bestLLH << std::endl;
+ 			return(bestLLH);
+ 		}
+ 
+@@ -2132,9 +2158,9 @@ namespace likelihood{
+ 	template<typename FuncType>
+ 	class BFGS_Function : public lbfgsb::BFGS_FunctionBase{
+ 	private:
+-		FuncType func;
++		const FuncType& func;
+ 	public:
+-		BFGS_Function(FuncType f):func(f){}
++		BFGS_Function(const FuncType& f):func(f){}
+ 		virtual double evalF(std::vector<double> x) const{
+             //std::cout << "EvaluateF: (";
+             //for(auto xi : x) std::cout << xi << ", ";
