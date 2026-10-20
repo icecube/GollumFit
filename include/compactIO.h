@@ -1,7 +1,7 @@
 #ifndef COMPACTIO_H_
 #define COMPACTIO_H_
 
-#include <deque>
+#include <vector>
 #include "Event.h"
 #include "GollumMCSet.h"
 
@@ -13,8 +13,8 @@
 namespace gollumfit {
 
 namespace dump {
-  void splatData(const std::string& filename, const uint32_t progChecksum, const std::deque<Event>& exp, const std::deque<Event>& sim);
-  void unsplatData(const std::string& filename, const uint32_t progChecksum, std::deque<Event>& exp, std::deque<Event>& sim);
+  void splatData(const std::string& filename, const uint32_t progChecksum, const std::vector<Event>& exp, const std::vector<Event>& sim);
+  void unsplatData(const std::string& filename, const uint32_t progChecksum, std::vector<Event>& exp, std::vector<Event>& sim);
 }
 
 }

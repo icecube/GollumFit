@@ -16,6 +16,8 @@
 #include "GollumParameters.h"
 #include "GollumTools.h"
 #include "utils.h"
+#include "SystematicsCache.h"
+#include "FastWeighter.h"
 
 /**
 * @file analysisWeighting.h
@@ -985,6 +987,10 @@ struct WeighterMaker{
         bool holeice_splines_loaded_ = false;
         bool attenuation_splines_loaded_ = false;
         gollumfit::SteeringParams const * steering;
+        // Per-event reduced-spline table used by the fast weighters. Built lazily
+        // from the spline maps and the registered event ranges.
+        mutable std::shared_ptr<const gollumfit::SystematicsCache> cache_;
+        std::vector<std::pair<const Event*,size_t>> eventRanges_;
     public:
         // default constructor // bad bad
         /**
@@ -1038,7 +1044,9 @@ struct WeighterMaker{
           domeff_splines_loaded_(guy.domeff_splines_loaded_),
           holeice_splines_loaded_(guy.holeice_splines_loaded_),
           attenuation_splines_loaded_(guy.attenuation_splines_loaded_),
-          steering(guy.steering)
+          steering(guy.steering),
+          cache_(guy.cache_),
+          eventRanges_(guy.eventRanges_)
         {}
         // assign guy // CA
         /**
@@ -1058,6 +1066,8 @@ struct WeighterMaker{
           holeice_splines_loaded_ = other.holeice_splines_loaded_;
           attenuation_splines_loaded_ = other.attenuation_splines_loaded_;
           steering = other.steering;
+          cache_ = other.cache_;
+          eventRanges_ = other.eventRanges_;
 
           return(*this);
         }
@@ -1079,26 +1089,71 @@ struct WeighterMaker{
           holeice_splines_loaded_ = std::move(other.holeice_splines_loaded_);
           attenuation_splines_loaded_ = std::move(other.attenuation_splines_loaded_);
           steering = std::move(other.steering);
+          cache_ = std::move(other.cache_);
+          eventRanges_ = std::move(other.eventRanges_);
 
           return(*this);
         }
     public:
         // Methods to set the respective spline maps and mark them as loaded.
-        void SetDOMEfficiencySplines(const DOMMapType& dom_splines){ domefficiencySplines_ = std::make_shared<const DOMMapType>(dom_splines); domeff_splines_loaded_ = true; }
-        void SetHoleIceSplines(const HoleIceMapType& holeice_splines){ holeiceSplines_ = std::make_shared<const HoleIceMapType>(holeice_splines); holeice_splines_loaded_ = true; }
-        void SetAttenuationSplines(const AttenuationMapType& attenuation_splines){ attenuationSplines_ = std::make_shared<const AttenuationMapType>(attenuation_splines); attenuation_splines_loaded_ = true; }
+        void SetDOMEfficiencySplines(const DOMMapType& dom_splines){ domefficiencySplines_ = std::make_shared<const DOMMapType>(dom_splines); domeff_splines_loaded_ = true; cache_.reset(); }
+        void SetHoleIceSplines(const HoleIceMapType& holeice_splines){ holeiceSplines_ = std::make_shared<const HoleIceMapType>(holeice_splines); holeice_splines_loaded_ = true; cache_.reset(); }
+        void SetAttenuationSplines(const AttenuationMapType& attenuation_splines){ attenuationSplines_ = std::make_shared<const AttenuationMapType>(attenuation_splines); attenuation_splines_loaded_ = true; cache_.reset(); }
         void SetSteering(const gollumfit::SteeringParams& steeringParams){steering = &steeringParams;}
 
         /**
-        * @brief Templated functor that calculates weights for events based on various components.
+        * @brief Registers the contiguous event containers that the fast weighters may be asked to weight.
+        *
+        * The per-event reduced-spline table is (re)built lazily from these ranges the next time a
+        * weighter is constructed. Must be called again whenever a registered container is reallocated.
+        */
+        void RegisterEventRanges(std::vector<std::pair<const Event*,size_t>> ranges){
+          eventRanges_ = std::move(ranges);
+          cache_.reset();
+        }
+
+        /// The per-event reduced-spline table (built on first use).
+        std::shared_ptr<const gollumfit::SystematicsCache> GetCache() const{
+          if(!cache_){
+            if(!domefficiencySplines_ || !holeiceSplines_ || !attenuationSplines_)
+              throw std::runtime_error("WeighterMaker: spline maps are not set; cannot build the systematics cache.");
+            auto c = std::make_shared<gollumfit::SystematicsCache>(*domefficiencySplines_, *holeiceSplines_, *attenuationSplines_);
+            for(const auto& r : eventRanges_)
+              c->addEvents(r.first, r.second);
+            cache_ = c;
+          }
+          return cache_;
+        }
+
+        /**
+        * @brief Fast weighter: weight of an event for a set of (double) parameters.
+        *
+        * Same result as LegacyWeighter<double>, computed from per-event reduced splines.
+        */
+        gollumfit::FastWeighter operator()(const std::vector<double>& params) const{
+          return gollumfit::FastWeighter(GetCache(), gollumfit::FastWeighterParams(params), steering==nullptr || steering->enableTotalNorm);
+        }
+
+        /**
+        * @brief Fast weighter with analytic gradient (38-dimensional dual numbers).
+        *
+        * Same result as LegacyWeighter<phys_tools::autodiff::FD<38>>.
+        */
+        gollumfit::FastGradWeighter operator()(const std::vector<phys_tools::autodiff::FD<38>>& params) const{
+          return gollumfit::FastGradWeighter(GetCache(), gollumfit::FastWeighterParams(params), steering==nullptr || steering->enableTotalNorm);
+        }
+
+        /**
+        * @brief Reference implementation: composed weighter chain evaluating the full 3-D splines per event.
         * 
-        * This function uses a vector of parameters to calculate the weights for different flux components and applies corrections for various physical effects.
+        * Kept as the definition of the weight (and for cross-checking the fast weighters, see
+        * GollumFit::CheckFastWeighter); it is an order of magnitude slower than operator().
         * 
         * @param params A vector of nuisance parameters used in the weight calculations.
         * @return A function that takes an `Event` and returns a weight of type `DataType`.
         */
         template<typename DataType>
-            std::function<DataType(const Event&)> operator()(const std::vector<DataType>& params) const{
+            std::function<DataType(const Event&)> LegacyWeighter(const std::vector<DataType>& params) const{
 
                 //unpack things so we have legible names
                 DataType convNorm                  = params[0];

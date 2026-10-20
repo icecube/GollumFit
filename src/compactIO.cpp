@@ -57,7 +57,7 @@ uint32_t getFileChecksum(const std::string& filename){
 * @param sim A deque of Event objects representing simulated data.
 * @throw std::runtime_error If the file cannot be opened for writing.
 */
-void splatData(const std::string& filename, const uint32_t progChecksum, const std::deque<Event>& exp, const std::deque<Event>& sim){
+void splatData(const std::string& filename, const uint32_t progChecksum, const std::vector<Event>& exp, const std::vector<Event>& sim){
 	std::ofstream datafile(filename);
 	if(!datafile)
 		throw std::runtime_error("Unable to open "+filename+" for writing");
@@ -104,7 +104,7 @@ void splatData(const std::string& filename, const uint32_t progChecksum, const s
 * @throw std::runtime_error If the file cannot be opened for reading, if the safety limit
 *       for the number of events is exceeded, or if the checksums do not match the data.
 */
-void unsplatData(const std::string& filename, const uint32_t expectedChecksum, std::deque<Event>& exp, std::deque<Event>& sim){
+void unsplatData(const std::string& filename, const uint32_t expectedChecksum, std::vector<Event>& exp, std::vector<Event>& sim){
 	std::ifstream datafile(filename);
 	if(!datafile)
 		throw std::runtime_error("Unable to open "+filename+" for reading");
@@ -129,9 +129,9 @@ void unsplatData(const std::string& filename, const uint32_t expectedChecksum, s
 								 +" experimental events, which is larger than the safety limit of "
 								 +boost::lexical_cast<std::string>(maxEvents));
 	exp.resize(size);
-	for(const Event& e : exp){
-		datafile.read((char*)&e,sizeof(e));
-		fileCRC.process_bytes((char*)&e,sizeof(e));
+	if(size){ //one block read instead of one read per event
+		datafile.read((char*)exp.data(),size*sizeof(Event));
+		fileCRC.process_bytes((char*)exp.data(),size*sizeof(Event));
 	}
 	
 	datafile.read((char*)&size,sizeof(size));
@@ -141,9 +141,9 @@ void unsplatData(const std::string& filename, const uint32_t expectedChecksum, s
 								 +" simulated events, which is larger than the safety limit of "
 								 +boost::lexical_cast<std::string>(maxEvents));
 	sim.resize(size);
-	for(const Event& e : sim){
-		datafile.read((char*)&e,sizeof(e));
-		fileCRC.process_bytes((char*)&e,sizeof(e));
+	if(size){
+		datafile.read((char*)sim.data(),size*sizeof(Event));
+		fileCRC.process_bytes((char*)sim.data(),size*sizeof(Event));
 	}
 	
 	datafile.read((char*)&storedChecksum,sizeof(storedChecksum));

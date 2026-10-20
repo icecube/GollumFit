@@ -311,7 +311,7 @@ struct meta_event_accumulator {
     MetaBinner binner;  ///< Binner function object instance.
     Combiner combiner;  ///< Combiner function object instance.
 
-    std::deque<Event> meta_events;  ///< Queue of accumulated meta events.
+    std::vector<Event> meta_events;  ///< Accumulated meta events.
     
     /**
     * @brief Constructs a meta_event_accumulator object.
@@ -447,7 +447,7 @@ struct meta_event_accumulator {
 * @return A deque containing the accumulated meta events from processing the histogram.
 */
 template<typename Event, typename MetaHistType, typename MetaBinner, typename Combiner, typename Histogram>
-std::deque<Event> get_fastmode_events(MetaHistType& meta_hist, MetaBinner& meta_binner, Combiner&& combiner, Histogram& hist){
+std::vector<Event> get_fastmode_events(MetaHistType& meta_hist, MetaBinner& meta_binner, Combiner&& combiner, Histogram& hist){
     detail::meta_event_accumulator<MetaHistType, MetaBinner, Combiner, Event> fm(meta_hist, meta_binner, combiner);
     detail::apply_to_histogram_bins<decltype(fm)> ath(fm);
     ath(hist);

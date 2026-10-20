@@ -323,7 +323,7 @@ def example_datapaths():
     datapaths = gf.DataPaths()
     
     # Point to example resources (adjust these paths based on actual location)
-    base_path = "/n/home01/awen/meows_home/GollumFit_test/GollumFit"
+    base_path = os.environ.get("GOLLUMFIT_ROOT", os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
     
     datapaths.domeff_spline_path = os.path.join(
         base_path, "resources/Splines/DOMEffSplines/new_ddmnodeis/BDT/DnnEnergy_0.99"

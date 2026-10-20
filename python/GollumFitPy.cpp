@@ -6,7 +6,9 @@
 
 #include <functional>
 #include "GollumFit.h"
+#ifdef GOLLUMFIT_HAVE_DIVER
 #include "GollumFitDiverWrapper.h"
+#endif
 
 #include <numpy/ndarrayobject.h>
 #include <numpy/ndarraytypes.h>
@@ -456,26 +458,29 @@ PYBIND11_MODULE(GollumFitPy, m)
     .def("CheckLikelihoodProblemConstruction",&GF::GollumFit::CheckLikelihoodProblemConstruction)
     .def("ReportStatus",&GF::GollumFit::ReportStatus)
     .def("GetDataDistribution",&GF::GollumFit::GetDataDistribution)
-    .def("ConstructFastMode",&GF::GollumFit::ConstructFastMode)
-    .def("ConstructLikelihoodProblem",&GF::GollumFit::ConstructLikelihoodProblem)
+    .def("ConstructFastMode",&GF::GollumFit::ConstructFastMode, py::call_guard<py::gil_scoped_release>())
+    .def("ConstructLikelihoodProblem",&GF::GollumFit::ConstructLikelihoodProblem, py::call_guard<py::gil_scoped_release>())
     .def("WriteCompact",&GF::GollumFit::WriteCompact)
     .def("GetEnergyBinsMC",&GF::GollumFit::GetEnergyBinsMC)
     .def("GetZenithBinsMC",&GF::GollumFit::GetZenithBinsMC)
     .def("GetTopologyBinsMC",&GF::GollumFit::GetTopologyBinsMC)
-    .def("GetExpectation",(nsq::marray<double,3>(GF::GollumFit::*)(GF::FitParameters)const)&GF::GollumFit::GetExpectation)
-    .def("GetSquareExpectation",(nsq::marray<double,3>(GF::GollumFit::*)(GF::FitParameters)const)&GF::GollumFit::GetSquareExpectation)
-    .def("GetRealization",(nsq::marray<double,3>(GF::GollumFit::*)(GF::FitParameters,int)const)&GF::GollumFit::GetRealization)
+    .def("GetExpectation",(nsq::marray<double,3>(GF::GollumFit::*)(GF::FitParameters)const)&GF::GollumFit::GetExpectation, py::call_guard<py::gil_scoped_release>())
+    .def("GetSquareExpectation",(nsq::marray<double,3>(GF::GollumFit::*)(GF::FitParameters)const)&GF::GollumFit::GetSquareExpectation, py::call_guard<py::gil_scoped_release>())
+    .def("GetRealization",(nsq::marray<double,3>(GF::GollumFit::*)(GF::FitParameters,int)const)&GF::GollumFit::GetRealization, py::call_guard<py::gil_scoped_release>())
     .def("GetDataEvents",&GF::GollumFit::GetDataEvents)
-    .def("GetRealizationEvents",(nsq::marray<double,2>(GF::GollumFit::*)(GF::FitParameters,int)const)&GF::GollumFit::GetRealizationEvents)
-    .def("GetExpectationEvents",(nsq::marray<double,2>(GF::GollumFit::*)(GF::FitParameters)const)&GF::GollumFit::GetExpectationEvents)
-    .def("CheckExpectation",(int(GF::GollumFit::*)(GF::FitParameters)const)&GF::GollumFit::CheckExpectation)
-    .def("EvalLLH",(double(GF::GollumFit::*)(GF::FitParameters,bool)const)&GF::GollumFit::EvalLLH)
-    .def("SetData", &GF::GollumFit::SetData)
-    .def("MinLLH",(GF::FitResult(GF::GollumFit::*)() const)&GF::GollumFit::MinLLH)
+    .def("GetRealizationEvents",(nsq::marray<double,2>(GF::GollumFit::*)(GF::FitParameters,int)const)&GF::GollumFit::GetRealizationEvents, py::call_guard<py::gil_scoped_release>())
+    .def("GetExpectationEvents",(nsq::marray<double,2>(GF::GollumFit::*)(GF::FitParameters)const)&GF::GollumFit::GetExpectationEvents, py::call_guard<py::gil_scoped_release>())
+    .def("CheckExpectation",(int(GF::GollumFit::*)(GF::FitParameters)const)&GF::GollumFit::CheckExpectation, py::call_guard<py::gil_scoped_release>())
+    .def("EvalLLH",(double(GF::GollumFit::*)(GF::FitParameters,bool)const)&GF::GollumFit::EvalLLH, py::call_guard<py::gil_scoped_release>())
+    .def("CheckFastWeighter",&GF::GollumFit::CheckFastWeighter, py::call_guard<py::gil_scoped_release>(),
+         "Compare the fast weighters with the reference weighter chain at the given parameters; returns the largest relative difference.")
+    .def("SetData", &GF::GollumFit::SetData, py::call_guard<py::gil_scoped_release>())
+    .def("MinLLH",(GF::FitResult(GF::GollumFit::*)() const)&GF::GollumFit::MinLLH, py::call_guard<py::gil_scoped_release>())
     .def("SetFitParametersSeed",(void(GF::GollumFit::*)(std::vector<GF::FitParameters>))&GF::GollumFit::SetFitParametersSeed)
     .def("SetFitParametersFlag",&GF::GollumFit::SetFitParametersFlag)
     .def("SetFitParametersBound",&GF::GollumFit::SetFitParametersBound)
     .def("SetFitParametersPriors",&GF::GollumFit::SetFitParametersPriors)
+#ifdef GOLLUMFIT_HAVE_DIVER
     .def("Dive",
         [](
             std::shared_ptr<GF::GollumFit> gf,
@@ -505,6 +510,7 @@ PYBIND11_MODULE(GollumFitPy, m)
         "    steer.diver_maxgen = 100\n"
         "    steer.diver_NP = 200\n"
         "    result = g.Dive(seed, bounds, priors, path)\n")
+#endif
     .def("GetSteeringParams",&GF::GollumFit::GetSteeringParams)
     .def("GetDataPaths",&GF::GollumFit::GetDataPaths)
   ;

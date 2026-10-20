@@ -115,13 +115,15 @@ class GollumFit {
     SteeringParams  steeringParams_; ///
     DataPaths       dataPaths_;
 
-    // to store events
-    std::deque<Event> metaEvents_;
-    std::deque<Event> mainSimulation_;
-    std::deque<Event> sample_;
+    // to store events. Contiguous storage: the histograms hold references to
+    // these events and the fast weighters index them by address, so the
+    // containers must not be reallocated after the histograms are built.
+    std::vector<Event> metaEvents_;
+    std::vector<Event> mainSimulation_;
+    std::vector<Event> sample_;
 
     // for fast mode only
-    std::deque<Event> auxSimulation_;
+    std::vector<Event> auxSimulation_;
 
     // histograms
     HistType dataHist_; // analysis data
@@ -236,6 +238,14 @@ class GollumFit {
   protected:
     // to check events
     bool IsEventHealthy(Event& e, bool print_reason = true) const;
+
+    /**
+    * @brief Tells the weighter maker which event containers it will be asked to weight.
+    *
+    * Must be called after the simulation containers reach their final size (histogram
+    * construction, fast mode) and after the weighter maker is re-created.
+    */
+    void RegisterSimulationWithWeighter();
 
     /**
     * @brief Adjusts the fit seed values to ensure they are within the valid ranges of the spline functions.
@@ -1244,9 +1254,21 @@ class GollumFit {
       DFWM = sterile::WeighterMaker(domefficiencySplines_,
                                     holeIceSplines_,
                                     attenuationSplines_,
-                                    p,
+                                    steeringParams_,
                                     dataPaths_);
+      RegisterSimulationWithWeighter();
     }
+
+    /**
+    * @brief Cross-checks the fast weighters against the reference (legacy) weighter chain.
+    *
+    * Evaluates every simulated event with both implementations, for the value and for the
+    * 38 partial derivatives, and prints the largest relative differences.
+    *
+    * @param fp The fit parameters at which to compare.
+    * @return The largest relative difference found (value or gradient).
+    */
+    double CheckFastWeighter(FitParameters fp) const;
     /**
     * @brief Sets the seed for fit parameters.
     * 

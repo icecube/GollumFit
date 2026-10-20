@@ -14,7 +14,7 @@ gollum_build_path = os.environ.get("GOLLUMBUILDPATH", "/usr/local/")
 cvmfs_root = os.environ.get("SROOT", "/usr/local/")
 prefix = os.environ.get("PREFIX", "/usr/local/")
 
-include_dirs = [
+include_dirs = ([os.environ["DIVER_DIR"] + "/include"] if os.environ.get("DIVER_DIR") else []) + [
     gollum_build_path + "/include",
     cvmfs_root + "/include",
     "/usr/local/include",
@@ -31,11 +31,18 @@ libraries = [
     "SQuIDS", "nuSQuIDS",
     "gsl", "gslcblas", "m", "z",
     "hdf5", "hdf5_hl", "PhysTools", "cfitsio", "GollumFit",
-    "diver",  # Diver DE optimizer
 ]
 
+# Diver DE optimizer is optional: enable it by pointing DIVER_DIR at a prefix
+# containing include/diver.hpp and lib/libdiver.so.
+diver_dir = os.environ.get("DIVER_DIR")
+define_macros = []
+if diver_dir:
+    libraries.append("diver")
+    define_macros.append(("GOLLUMFIT_HAVE_DIVER", "1"))
+
 architecture = os.uname().machine
-library_dirs = [
+library_dirs = ([diver_dir + "/lib"] if diver_dir else []) + [
     gollum_build_path + f"/lib/python{sys.version_info[0]}.{sys.version_info[1]}/site-packages",
     gollum_build_path + "/lib",
     gollum_build_path + "/lib64",
@@ -76,7 +83,8 @@ ext = Pybind11Extension(
     libraries=libraries,
     include_dirs=include_dirs,
     extra_objects=extra_objs,
-    extra_compile_args=["-v", "-O3", "-fPIC", "-std=c++17", "-fpermissive"],
+    define_macros=define_macros,
+    extra_compile_args=["-v", "-O3", "-DNDEBUG", "-march=haswell", "-fno-math-errno", "-fPIC", "-std=c++17", "-fpermissive"],
     extra_link_args=extra_link_args,
     language="c++",
 )

@@ -680,6 +680,9 @@ HEADERS = $(PATH_GF)/include/analysisWeighting.h \
           $(PATH_GF)/include/GollumMCSet.h \
           $(PATH_GF)/include/GollumMCSpecifications.h \
 		  $(PATH_GF)/include/GollumTools.h \
+		  $(PATH_GF)/include/ReducedSplines.h \
+		  $(PATH_GF)/include/SystematicsCache.h \
+		  $(PATH_GF)/include/FastWeighter.h \
 		  $(PATH_GF)/include/json.hpp \
 		  $(PATH_GF)/include/utils.h
 
@@ -689,7 +692,7 @@ echo '
 
 CFLAGS=-O0 -fPIC
 
-CXXFLAGS +=-std=c++17 -O3
+CXXFLAGS +=-std=c++17 -O3 -g -DNDEBUG -march=haswell -fno-math-errno
 
 # Directories
 '  >> ./Makefile
@@ -813,7 +816,7 @@ $(LIB_GF)/GollumEnumDefinitions.o : $(SRC_GF)/GollumEnumDefinitions.cpp $(INC_GF
 $(LIB_GF)/utils.o : $(SRC_GF)/utils.cpp $(INC_GF)/utils.h
 	$(CXX) $(CXXFLAGS) $(SRC_GF)/utils.cpp -c -o $(LIB_GF)/utils.o
 
-$(LIB_GF)/GollumFit.o : $(SRC_GF)/GollumFit.cpp $(INC_GF)/Event.h $(INC_GF)/analysisWeighting.h $(INC_GF)/compactIO.h $(INC_GF)/GollumFit.h $(INC_GF)/GollumParameters.h $(INC_GF)/GollumEnumDefinitions.h $(INC_GF)/FastMode.h
+$(LIB_GF)/GollumFit.o : $(SRC_GF)/GollumFit.cpp $(INC_GF)/Event.h $(INC_GF)/analysisWeighting.h $(INC_GF)/compactIO.h $(INC_GF)/GollumFit.h $(INC_GF)/GollumParameters.h $(INC_GF)/GollumEnumDefinitions.h $(INC_GF)/FastMode.h $(INC_GF)/FastWeighter.h $(INC_GF)/SystematicsCache.h $(INC_GF)/ReducedSplines.h $(PREFIX)/include/PhysTools/likelihood/likelihood.h $(PREFIX)/include/PhysTools/histogram.h $(PREFIX)/include/PhysTools/ThreadPool.h $(PREFIX)/include/PhysTools/autodiff.h
 	$(CXX) $(CXXFLAGS) $(SRC_GF)/GollumFit.cpp -c -o $(LIB_GF)/GollumFit.o
 
 $(DYN_PRODUCT) : $(OBJECTS)

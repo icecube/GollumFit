@@ -559,6 +559,58 @@ void GollumFit::ConstructSimulationHistogram(){
   bin(mainSimulation_, simHist_, binner);
 
   simulation_histogram_constructed_=true;
+  RegisterSimulationWithWeighter();
+}
+
+void GollumFit::RegisterSimulationWithWeighter(){
+  std::vector<std::pair<const Event*,size_t>> ranges;
+  if(!mainSimulation_.empty())
+    ranges.emplace_back(mainSimulation_.data(), mainSimulation_.size());
+  if(!metaEvents_.empty())
+    ranges.emplace_back(metaEvents_.data(), metaEvents_.size());
+  DFWM.RegisterEventRanges(ranges);
+}
+
+double GollumFit::CheckFastWeighter(FitParameters fp) const {
+  using FD38 = phys_tools::autodiff::FD<38>;
+  std::vector<double> params = ConvertFitParameters(fp);
+  std::vector<FD38> fdparams(params.size());
+  for(size_t i=0; i<params.size(); i++)
+    fdparams[i] = FD38(params[i], i);
+
+  auto fast = DFWM(params);
+  auto fastGrad = DFWM(fdparams);
+  auto legacy = DFWM.LegacyWeighter<double>(params);
+  auto legacyGrad = DFWM.LegacyWeighter<FD38>(fdparams);
+
+  const std::vector<Event>& sim = (fastmode_constructed_)?metaEvents_:mainSimulation_;
+  double worstValue=0, worstGrad=0;
+  size_t worstValueIdx=0, worstGradIdx=0, skipped=0;
+  for(size_t i=0; i<sim.size(); i++){
+    const Event& e = sim[i];
+    double wl, wf = fast(e);
+    FD38 gl, gf = fastGrad(e);
+    try{
+      wl = legacy(e);
+      gl = legacyGrad(e);
+    } catch(std::exception& ex){
+      skipped++; // the legacy gradient path throws for events outside a spline's support
+      continue;
+    }
+    double scale = std::max(std::fabs(wl), 1e-300);
+    double dv = std::fabs(wf-wl)/scale;
+    if(dv > worstValue){ worstValue = dv; worstValueIdx = i; }
+    double gscale = scale;
+    for(unsigned int k=0; k<38; k++) gscale = std::max(gscale, std::fabs(gl.derivative(k)));
+    for(unsigned int k=0; k<38; k++){
+      double dg = std::fabs(gf.derivative(k)-gl.derivative(k))/gscale;
+      if(dg > worstGrad){ worstGrad = dg; worstGradIdx = i; }
+    }
+  }
+  std::cout << "CheckFastWeighter over " << sim.size() << " events (" << skipped << " skipped): max rel. value diff "
+            << worstValue << " (event " << worstValueIdx << "), max rel. gradient diff " << worstGrad
+            << " (event " << worstGradIdx << ")" << std::endl;
+  return std::max(worstValue, worstGrad);
 }
 
 /*************************************************************************************************************
@@ -1064,6 +1116,7 @@ void GollumFit::ConstructFastMode(double meta_scaling) {
   simHist_ = std::move(newZeroHist);
 
   fastmode_constructed_ = true;
+  RegisterSimulationWithWeighter();
 }
 
 /*************************************************************************************************************
@@ -1269,6 +1322,9 @@ void GollumFit::ReportStatus() const {
 
 double GollumFit::SetData(marray<double,2> Data) {
   double TotalWeight=0;
+  // The likelihood problem holds references into sample_; it must be rebuilt.
+  prob_.reset();
+  likelihood_problem_constructed_=false;
   sample_.clear();
   for(size_t i=0; i!=Data.extent(0); ++i)
     {
@@ -1335,7 +1391,7 @@ marray<double,2> GollumFit::GetExpectationEvents(FitParameters fit_params) const
 }
 
 marray<double,2> GollumFit::GetExpectationEvents(std::vector<double> fit_params) const {
-  const std::deque<Event> & sim = (fastmode_constructed_)?metaEvents_:mainSimulation_;
+  const std::vector<Event> & sim = (fastmode_constructed_)?metaEvents_:mainSimulation_;
   marray<double,2> ReturnVec {sim.size(), 4} ;
   auto weighter = DFWM(fit_params);
   for(size_t i=0; i!=sim.size(); ++i) {
@@ -1352,7 +1408,7 @@ int GollumFit::CheckExpectation(FitParameters fit_params) const {
 }
 
 int GollumFit::CheckExpectation(std::vector<double> fit_params) const {
-  const std::deque<Event> & sim = (fastmode_constructed_)?metaEvents_:mainSimulation_;
+  const std::vector<Event> & sim = (fastmode_constructed_)?metaEvents_:mainSimulation_;
   auto weighter = DFWM(fit_params);
   for(size_t i=0; i!=sim.size(); ++i) {
       if ( weighter(sim[i])<0 ) return 1;

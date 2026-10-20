@@ -451,10 +451,10 @@ struct Priors {
   */
 struct FitResult {
   FitParameters params;
-  double likelihood;
-  double aux_likelihood; ///<TO DO
-  unsigned int nEval, nGrad;
-  bool succeeded;
+  double likelihood = 0;
+  double aux_likelihood = 0; ///<TO DO
+  unsigned int nEval = 0, nGrad = 0;
+  bool succeeded = false;
 
   /**
   * @brief Constructor
@@ -568,8 +568,12 @@ struct SteeringParams {
 
   double fullLivetime;
 
-  double change_tol = 1.e-20;
-  double grad_tol = 1.e-20;
+  /// L-BFGS-B stopping criteria. change_tol: absolute change of the log-likelihood between
+  /// successive iterations; grad_tol: largest component of the scaled projected gradient
+  /// (scale 1e-3 per parameter). 1e-6 reproduces a machine-precision (1e-20) fit of the example
+  /// to 1e-3 in LLH with ~20% fewer evaluations; looser values stop early along flat directions.
+  double change_tol = 1.e-6;
+  double grad_tol = 1.e-6;
   double uncertaintyModSigmaOverMu = 0.;
 
   string model_label;
