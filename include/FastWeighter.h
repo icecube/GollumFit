@@ -94,7 +94,7 @@ public:
         const SystematicsCache& cache = *cache_;
         const size_t idx = cache.index(e);
         const SystematicsCache::EventInfo& info = cache.info(idx);
-        const float* row = cache.row(idx);
+        const SplineReal* row = cache.row(idx);
         const SystematicsCache::Layout& L = cache.layout();
         const FastWeighterParams& p = p_;
 
@@ -214,13 +214,13 @@ private:
     std::vector<ReducedAxisSpline::Basis> domBasis_, holeBasis_, attBasisNu_, attBasisNubar_;
 
     /// DOM-efficiency / hole-ice factor 10^(rate(p) - rate(nominal)) and its derivative wrt p.
-    static inline void detectorFactor(int8_t table, float nominal, const float* coef,
+    static inline void detectorFactor(int8_t table, SplineReal nominal, const SplineReal* coef,
                                       const std::vector<ReducedAxisSpline::Basis>& bases, double& f, double& df) {
         if (table == SystematicsCache::kTableNone) { f = 1.0; df = 0.0; return; }
         if (table == SystematicsCache::kTableZero || nominal == SystematicsCache::kNominalSentinel) { f = 0.0; df = 0.0; return; }
         const ReducedAxisSpline::Basis& bs = bases[table];
         if (!bs.valid) { f = 0.0; df = 0.0; return; } // parameter outside the spline range: event ignored
-        const float r = ReducedAxisSpline::eval(coef, bs);
+        const SplineReal r = ReducedAxisSpline::eval(coef, bs);
         if (r == 0.f) { f = 0.0; df = 0.0; return; }
         f = std::exp(kLn10 * (static_cast<double>(r) - static_cast<double>(nominal)));
         df = f * kLn10 * static_cast<double>(ReducedAxisSpline::evalDeriv(coef, bs));

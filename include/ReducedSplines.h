@@ -28,6 +28,9 @@
 
 namespace gollumfit {
 
+/// Precision of reduced-spline storage and evaluation (double: early-stopping test, LOG 2026-10-22-09).
+using SplineReal = double;
+
 class ReducedAxisSpline {
 public:
     static constexpr unsigned int kAxis = 2; ///< axis along which the 1-D spline is kept
@@ -38,8 +41,8 @@ public:
         bool valid = false;      ///< p inside the knot range (photospline's searchcenters succeeded)
         int first = 0;           ///< index of the first non-zero reduced coefficient
         unsigned int n = 0;      ///< number of non-zero basis functions (order+1)
-        float b[kMaxOrder + 1];  ///< B_k(p)
-        float db[kMaxOrder + 1]; ///< dB_k/dp
+        SplineReal b[kMaxOrder + 1];  ///< B_k(p)
+        SplineReal db[kMaxOrder + 1]; ///< dB_k/dp
     };
 
     explicit ReducedAxisSpline(const photospline::splinetable<>& table) : table_(&table) {
@@ -63,13 +66,13 @@ public:
     /// Reduced coefficients for a fixed point (x0,x1) of the first two axes.
     /// Returns false, with out[] zero-filled, if the point is outside the
     /// table support (photospline's operator() evaluates to 0 there).
-    bool reduce(double x0, double x1, float* out) const {
+    bool reduce(double x0, double x1, SplineReal* out) const {
         const unsigned int nk = naxes_[kAxis];
         std::fill(out, out + nk, 0.f);
         int c0, c1;
         if (!searchcenter(0, x0, c0) || !searchcenter(1, x1, c1))
             return false;
-        float b0[kMaxOrder + 1], b1[kMaxOrder + 1];
+        SplineReal b0[kMaxOrder + 1], b1[kMaxOrder + 1];
         photospline::bsplvb_simple(knots_[0], nknots_[0], x0, c0, order_[0] + 1, b0);
         photospline::bsplvb_simple(knots_[1], nknots_[1], x1, c1, order_[1] + 1, b1);
         double acc[256];
@@ -88,7 +91,7 @@ public:
             }
         }
         for (unsigned int k = 0; k < nk; ++k)
-            out[k] = static_cast<float>(acc[k]);
+            out[k] = static_cast<SplineReal>(acc[k]);
         return true;
     }
 
@@ -107,15 +110,15 @@ public:
     }
 
     /// Spline value from reduced coefficients d and a basis.
-    static inline float eval(const float* d, const Basis& bs) {
-        float r = 0.f;
+    static inline SplineReal eval(const SplineReal* d, const Basis& bs) {
+        SplineReal r = 0.;
         for (unsigned int j = 0; j < bs.n; ++j)
             r += d[bs.first + j] * bs.b[j];
         return r;
     }
     /// d(value)/dp from reduced coefficients d and a basis.
-    static inline float evalDeriv(const float* d, const Basis& bs) {
-        float r = 0.f;
+    static inline SplineReal evalDeriv(const SplineReal* d, const Basis& bs) {
+        SplineReal r = 0.;
         for (unsigned int j = 0; j < bs.n; ++j)
             r += d[bs.first + j] * bs.db[j];
         return r;

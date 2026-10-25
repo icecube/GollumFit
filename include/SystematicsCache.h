@@ -54,8 +54,8 @@ public:
 
     /// Per-event bookkeeping (the reduced coefficients live in a separate flat array).
     struct EventInfo {
-        float domNominal[kComponents];  ///< log10-rate at the nominal DOM efficiency, or kNominalSentinel
-        float holeNominal[kComponents]; ///< log10-rate at the nominal hole-ice parameter, or kNominalSentinel
+        SplineReal domNominal[kComponents];  ///< log10-rate at the nominal DOM efficiency, or kNominalSentinel
+        SplineReal holeNominal[kComponents]; ///< log10-rate at the nominal hole-ice parameter, or kNominalSentinel
         float logPrimaryEnergy;         ///< ln(primaryEnergy), for the astrophysical tilt
         int8_t domTable[kComponents];   ///< index into domTables, kTableNone or kTableZero
         int8_t holeTable[kComponents];
@@ -129,7 +129,7 @@ public:
         throw std::runtime_error("SystematicsCache: event is not part of a registered simulation set");
     }
     inline const EventInfo& info(size_t idx) const { return infos_[idx]; }
-    inline const float* row(size_t idx) const { return &rows_[idx * layout_.stride]; }
+    inline const SplineReal* row(size_t idx) const { return &rows_[idx * layout_.stride]; }
 
 private:
     struct Range { const Event* begin; size_t n; size_t offset; };
@@ -144,7 +144,7 @@ private:
     Layout layout_;
     std::vector<Range> ranges_;
     std::vector<EventInfo> infos_;
-    std::vector<float> rows_;
+    std::vector<SplineReal> rows_;
 
     template <typename Map>
     static bool componentInMap(const Map& m, FluxComponent c) {
@@ -170,7 +170,7 @@ private:
     static void reduceDetector(const Event& e, FluxComponent comp, bool componentPresent,
                                const std::vector<std::pair<FluxComponent, Topology>>& keys,
                                const std::vector<ReducedAxisSpline>& tables, double nominal,
-                               const char* what, int8_t& tableIdx, float& nominalRate, float* out) {
+                               const char* what, int8_t& tableIdx, SplineReal& nominalRate, SplineReal* out) {
         if (!componentPresent) {
             tableIdx = kTableNone;
             nominalRate = 0.f;
@@ -187,13 +187,13 @@ private:
             return;
         }
         ReducedAxisSpline::Basis bs = t.basis(nominal);
-        float r = bs.valid ? ReducedAxisSpline::eval(out, bs) : 0.f;
+        SplineReal r = bs.valid ? ReducedAxisSpline::eval(out, bs) : 0.;
         if (!std::isfinite(r))
             throw std::runtime_error(std::string(what) + " spline evaluates to a non-finite value at the nominal point.");
         nominalRate = (r == 0.f) ? kNominalSentinel : r;
     }
 
-    void build(const Event& e, EventInfo& info, float* row) const {
+    void build(const Event& e, EventInfo& info, SplineReal* row) const {
         info.logPrimaryEnergy = static_cast<float>(std::log(static_cast<double>(e.primaryEnergy)));
         info.isNeutrino = tools::isNeutrino(e.primaryType);
         info.isAntiparticle = static_cast<int>(e.primaryType) < 0;
